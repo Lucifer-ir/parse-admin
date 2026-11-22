@@ -1,1 +1,10 @@
-# Parse Admin\n\nStandalone static admin dashboard for Parse, hosted on GitHub Pages.\n\n## Setup\n1. Enable GitHub Pages using **GitHub Actions** in repository Settings → Pages.\n2. Push to `main` to deploy.\n3. On the login screen enter the backend API base URL (without trailing slash), username and password.\n\nThe dashboard uses `POST /auth/login`, `GET /auth/me`, `GET /admin/stats`, and `POST /auth/logout`. The API account must have the `admin` role.\n\n## API CORS\nConfigure backend `CORS_ORIGINS` to include the deployed Pages origin (for example `https://lucifer-ir.github.io`).\n\nThis project does not include secrets or embed credentials.
+# Parse Admin
+
+Light-theme standalone admin dashboard for Parse, hosted on GitHub Pages.
+
+- Minimal typography-only brand (no logo mark)
+- API URL is configurable in dashboard settings and stored locally
+- Default login form values are placeholders: admin@parse.local / ParseAdmin123!
+- These credentials only work after an admin account with these credentials is provisioned in the API. Change them before production.
+
+Enable Pages using GitHub Actions in repository Settings → Pages.
