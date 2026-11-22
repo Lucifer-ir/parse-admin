@@ -5,7 +5,7 @@
 <main class="shell">
 <section id="login" class="login-card">
 <div class="brand"><h1>Parse <span>Admin</span></h1><small>مدیریت پلتفرم آموزشی</small></div>
-<p class="muted">برای ورود به پنل، با حساب مدیر وارد شوید.</p>
+<p class="muted">برای ورود به پنل، با حساب مدیر وارد شوید.</p>\n<section class="api-setup"><h3>اتصال به Parse API</h3><label>آدرس سرویس API<input id="api" type="url" placeholder="https://your-api-domain.com"></label><div class="api-buttons"><button id="saveSettings" class="ghost" type="button">ذخیره آدرس</button><button id="testApi" class="ghost" type="button">بررسی اتصال</button></div><p id="settingsMessage" class="muted">ابتدا آدرس API را تنظیم کنید.</p></section>
 <form id="loginForm"><label>نام کاربری / ایمیل<input id="username" autocomplete="username" value="admin@parse.local" required></label><label>رمز عبور<input id="password" type="password" autocomplete="current-password" value="ParseAdmin123!" required></label><button class="primary" type="submit">ورود</button><p id="loginError" class="error"></p></form>
 </section>
 <section id="dashboard" hidden>
@@ -13,7 +13,7 @@
 <div class="welcome"><h2>داشبورد</h2><p class="muted">نمای کلی آمار پلتفرم</p></div>
 <div class="cards"><article class="stat"><span>کاربران</span><strong id="users">—</strong><small>کل حساب‌های ثبت‌شده</small></article><article class="stat"><span>منابع آموزشی</span><strong id="sources">—</strong><small>کل منابع بارگذاری‌شده</small></article><article class="stat"><span>سؤالات</span><strong id="questions">—</strong><small>کل سؤالات ذخیره‌شده</small></article></div>
 <div class="panel"><div><h3>وضعیت اتصال</h3><p id="connection" class="muted">—</p></div><button id="refresh" class="ghost">به‌روزرسانی</button></div>
-<section class="settings"><h3>تنظیمات</h3><label>آدرس API<input id="api" type="url" placeholder="https://your-api.onrender.com"></label><button id="saveSettings" class="primary">ذخیره تنظیمات</button><p id="settingsMessage" class="muted"></p></section>
+<section class="settings"><h3>تنظیمات اتصال</h3><p class="muted">آدرس API از بخش ورود قابل مدیریت است.</p></section>
 <footer>Parse Admin</footer>
 </section>
 </main><script src="./assets/app.js"></script></body></html>
