@@ -152,7 +152,7 @@ $('#checkDashboardApi').addEventListener('click', async () => {
   catch (error) { $('#dashboardSettingsMessage').textContent = error.message; }
 });
 $('#refresh').addEventListener('click', refreshDashboard);
-$('#logout').addEventListener('click', () => { token = ''; sessionStorage.removeItem('parse_admin_token'); switchToLogin(); });
+$('#logout').addEventListener('click', async () => {\n  try { if (token) await request('/auth/logout', { method: 'POST' }); } catch { /* Clear local session even if the API is offline. */ }\n  token = ''; sessionStorage.removeItem('parse_admin_token'); switchToLogin();\n});
 $('#userSearch').addEventListener('input', renderUsers);
 $('#questionSearch').addEventListener('input', renderQuestions);
 $('#questionsTable').addEventListener('click', async event => {
