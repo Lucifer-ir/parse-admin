@@ -373,6 +373,8 @@ if ($method === 'POST' && $path === '/ai/chat/stream') {
     if(isset($body['tools']) && is_array($body['tools'])) $payload['tools']=$body['tools'];
     if(isset($body['tool_choice'])) $payload['tool_choice']=$body['tool_choice'];
     if(isset($body['response_format']) && is_array($body['response_format'])) $payload['response_format']=$body['response_format'];
+    if(isset($body['pdf_processing']) && is_array($body['pdf_processing'])) $payload['pdf_processing']=$body['pdf_processing'];
+    if(isset($body['structured_outputs']) && is_array($body['structured_outputs'])) $payload['structured_outputs']=$body['structured_outputs'];
 
     $headers=['Authorization: Bearer '.$apiKey,'Content-Type: application/json','Accept: text/event-stream','Idempotency-Key: '.bin2hex(random_bytes(18))];
     $responseHeaders=[];
