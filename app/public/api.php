@@ -344,10 +344,13 @@ if ($method === 'POST' && $path === '/platform/activities') {
     $due=trim((string)($body['due_at']??''))?:null;
     if($due!==null){$due=str_replace('T',' ',$due);if(strlen($due)===16)$due.=':00';}
     $status=in_array(($body['status']??'draft'),['draft','published','closed'],true)?$body['status']:'draft';
-    $pdo=app_db();$pdo->beginTransaction();
+    $pdo=app_db();
+    $trackId=!empty($body['track_id'])?(int)$body['track_id']:null;
+    $resolvedLevel=platform_track_level($pdo,$trackId);
+    $pdo->beginTransaction();
     try{
       $pdo->prepare('INSERT INTO learning_activities(activity_type,title,description,subject,level,track_id,instructions,due_at,status,created_by) VALUES(?,?,?,?,?,?,?,?,?,?)')
-       ->execute([$type,$title,trim((string)($body['description']??''))?:null,trim((string)($body['subject']??''))?:null,trim((string)($body['level']??''))?:null,!empty($body['track_id'])?(int)$body['track_id']:null,trim((string)($body['instructions']??''))?:null,$due,$status,(int)$admin['id']]);
+       ->execute([$type,$title,trim((string)($body['description']??''))?:null,trim((string)($body['subject']??''))?:null,$resolvedLevel,$trackId,trim((string)($body['instructions']??''))?:null,$due,$status,(int)$admin['id']]);
       $activityId=(int)$pdo->lastInsertId();
       $valid=$pdo->prepare('SELECT id FROM question_bank WHERE id=? AND status=\'published\'');
       $link=$pdo->prepare('INSERT INTO activity_questions(activity_id,question_id,position) VALUES(?,?,?)');
@@ -356,10 +359,15 @@ if ($method === 'POST' && $path === '/platform/activities') {
       if(!empty($body['target_student_id']))$targetIds[]=(int)$body['target_student_id'];
       $targetIds=array_values(array_unique($targetIds));
       if(!$targetIds){
-        $level=trim((string)($body['level']??''));
-        $query=$level!==''?$pdo->prepare("SELECT id FROM students WHERE status='active' AND level=?"): $pdo->query("SELECT id FROM students WHERE status='active'");
-        if($level!=='')$query->execute([$level]);
-        if($level==='' && !empty($body['track_id'])) { $query=$pdo->prepare("SELECT id FROM students WHERE status='active' AND track_id=?"); $query->execute([(int)$body['track_id']]); }
+        if($trackId!==null){
+          $query=$pdo->prepare("SELECT id FROM students WHERE status='active' AND track_id=?");
+          $query->execute([$trackId]);
+        }elseif($resolvedLevel!==null){
+          $query=$pdo->prepare("SELECT id FROM students WHERE status='active' AND level=?");
+          $query->execute([$resolvedLevel]);
+        }else{
+          $query=$pdo->query("SELECT id FROM students WHERE status='active'");
+        }
         $targetIds=array_map('intval',$query->fetchAll(PDO::FETCH_COLUMN));
       }
       if(count($targetIds)>10000)throw new InvalidArgumentException('تعداد دانش‌آموزان هدف بیش از حد مجاز است.');
@@ -660,6 +668,8 @@ if ($method === 'POST' && $path === '/platform/resources') {
     if ($title === '' || mb_strlen($title) > 255) app_json(422, ['error' => 'عنوان منبع آموزشی الزامی است.']);
     $content = trim((string)($body['content_text'] ?? ''));
     $fileUrl = trim((string)($body['file_url'] ?? '')) ?: null;
+    $trackId = !empty($body['track_id']) ? (int)$body['track_id'] : null;
+    $resolvedLevel = platform_track_level(app_db(), $trackId);
     $storedPath = null; $originalName = null;
     if ($isUpload) {
         $file = $_FILES['resource_file'];
@@ -688,7 +698,7 @@ if ($method === 'POST' && $path === '/platform/resources') {
     $stmt->execute([
         $type,$title,trim((string)($body['description'] ?? '')) ?: null,
         trim((string)($body['subject'] ?? '')) ?: null,
-        trim((string)($body['level'] ?? '')) ?: null,!empty($body['track_id']) ? (int)$body['track_id'] : null,
+        $resolvedLevel,$trackId,
         $content !== '' ? $content : null,$fileUrl,$storedPath,$originalName,
         !empty($body['published']) ? 1 : 0,(int)$admin['id']
     ]);
@@ -739,7 +749,10 @@ if ($method === 'POST' && $path === '/platform/questions') {
     $resourceId = !empty($body['resource_id']) ? (int)$body['resource_id'] : null;
     $studentId = !empty($body['target_student_id']) ? (int)$body['target_student_id'] : null;
     $skill = in_array(($body['skill'] ?? 'general'), ['listening','speaking','reading','writing','grammar','vocabulary','general'], true) ? $body['skill'] : 'general';
-    $pdo = app_db(); $pdo->beginTransaction(); $saved = [];
+    $pdo = app_db();
+    $trackId = !empty($body['track_id']) ? (int)$body['track_id'] : null;
+    $resolvedLevel = platform_track_level($pdo, $trackId);
+    $pdo->beginTransaction(); $saved = [];
     try {
         foreach ($items as $item) {
             if (!is_array($item) || trim((string)($item['question_text'] ?? '')) === '') continue;
@@ -757,8 +770,8 @@ if ($method === 'POST' && $path === '/platform/questions') {
                  VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
             );
             $stmt->execute([
-                $resourceId,$studentId,!empty($body['track_id']) ? (int)$body['track_id'] : null,$subject,
-                trim((string)($item['level'] ?? $body['level'] ?? '')) ?: null,$skill,$qType,
+                $resourceId,$studentId,$trackId,$subject,
+                $resolvedLevel,$skill,$qType,
                 trim((string)$item['question_text']),platform_json_value($options),
                 trim((string)($item['audio_url'] ?? $body['audio_url'] ?? '')) ?: null,
                 platform_json_value($item['correct_answer'] ?? $item['answer'] ?? null),
@@ -784,7 +797,8 @@ if ($method === 'POST' && $path === '/platform/questions/generate') {
     $count = min(40, max(1, (int)($body['count'] ?? 10)));
     $qType = platform_question_type((string)($body['question_type'] ?? 'multiple_choice'));
     $subject = trim((string)($body['subject'] ?? 'عمومی'));
-    $level = trim((string)($body['level'] ?? ''));
+    $trackId = !empty($body['track_id']) ? (int)$body['track_id'] : null;
+    $level = platform_track_level(app_db(), $trackId) ?? '';
     $targetStudentId = !empty($body['target_student_id']) ? (int)$body['target_student_id'] : null;
     if ($model === '' || $resourceId < 1) app_json(422, ['error' => 'مدل و فایل منبع آموزشی را انتخاب کنید.']);
     $sourceStmt = app_db()->prepare('SELECT id,title,content_text FROM learning_resources WHERE id=? LIMIT 1');
@@ -820,7 +834,7 @@ if ($method === 'POST' && $path === '/platform/questions/generate') {
     if (!is_array($items)) app_json(502,['error'=>'خروجی مدل JSON معتبر برای بانک سؤال نبود.','raw_output'=>mb_substr($output,0,4000)]);
     $saveBody = [
       'questions'=>array_slice($items,0,$count),'subject'=>$subject,'level'=>$level,
-      'skill'=>$body['skill'] ?? 'general','resource_id'=>$resourceId,'target_student_id'=>$targetStudentId,'status'=>'draft'
+      'skill'=>$body['skill'] ?? 'general','resource_id'=>$resourceId,'target_student_id'=>$targetStudentId,'track_id'=>$trackId,'audio_url'=>trim((string)($body['audio_url']??''))?:null,'status'=>'draft'
     ];
     // Save with the same validation path used for manually authored questions.
     $fake = $saveBody;
@@ -835,7 +849,7 @@ if ($method === 'POST' && $path === '/platform/questions/generate') {
         }
         $stmt=$pdo->prepare('INSERT INTO question_bank(resource_id,target_student_id,track_id,subject,level,skill,question_type,question_text,options_json,audio_url,answer_json,explanation,difficulty,points,tags_json,status,created_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
         $stmt->execute([
-          $resourceId,$targetStudentId,!empty($body['track_id']) ? (int)$body['track_id'] : null,$subject,$level,
+          $resourceId,$targetStudentId,$trackId,$subject,$level,
           in_array(($body['skill'] ?? 'general'),['listening','speaking','reading','writing','grammar','vocabulary','general'],true)?$body['skill']:'general',
           $itemType,trim((string)$item['question_text']),platform_json_value($options),
           trim((string)($item['audio_url'] ?? $body['audio_url'] ?? '')) ?: null,
@@ -887,10 +901,13 @@ if ($method === 'POST' && $path === '/platform/exams') {
     $start=trim((string)($body['starts_at']??''))?:null;$end=trim((string)($body['ends_at']??''))?:null;
     if($start!==null&&$end!==null&&strtotime($end)<=strtotime($start))app_json(422,['error'=>'زمان پایان باید بعد از زمان شروع باشد.']);
     $status=in_array(($body['status']??'draft'),['draft','published','closed'],true)?$body['status']:'draft';
-    $pdo=app_db();$pdo->beginTransaction();
+    $pdo=app_db();
+    $trackId=!empty($body['track_id'])?(int)$body['track_id']:null;
+    $resolvedLevel=platform_track_level($pdo,$trackId);
+    $pdo->beginTransaction();
     try{
       $pdo->prepare('INSERT INTO exams(title,description,subject,level,track_id,duration_minutes,starts_at,ends_at,target_student_id,shuffle_questions,shuffle_options,show_result,passing_score,status,created_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-        ->execute([$title,trim((string)($body['description']??''))?:null,trim((string)($body['subject']??''))?:null,trim((string)($body['level']??''))?:null,!empty($body['track_id'])?(int)$body['track_id']:null,$duration,$start,$end,!empty($body['target_student_id'])?(int)$body['target_student_id']:null,!empty($body['shuffle_questions'])?1:0,!empty($body['shuffle_options'])?1:0,!empty($body['show_result'])?1:0,max(0,min(100,(float)($body['passing_score']??50))),$status,(int)$admin['id']]);
+        ->execute([$title,trim((string)($body['description']??''))?:null,trim((string)($body['subject']??''))?:null,$resolvedLevel,$trackId,$duration,$start,$end,!empty($body['target_student_id'])?(int)$body['target_student_id']:null,!empty($body['shuffle_questions'])?1:0,!empty($body['shuffle_options'])?1:0,!empty($body['show_result'])?1:0,max(0,min(100,(float)($body['passing_score']??50))),$status,(int)$admin['id']]);
       $examId=(int)$pdo->lastInsertId();
       $validStmt=$pdo->prepare('SELECT id FROM question_bank WHERE id=? AND status=\'published\'');
       $link=$pdo->prepare('INSERT INTO exam_questions(exam_id,question_id,position,points) VALUES(?,?,?,?)');
