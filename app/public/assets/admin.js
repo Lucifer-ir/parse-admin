@@ -84,15 +84,15 @@
     if (page === 'settings') { loadSettings(); loadPlatformSettings(); }
     if (page === 'users') loadUsers();
     if (page === 'prompts') loadPrompts();
-    if (page === 'students') loadStudents();
-    if (page === 'resources') loadResources();
-    if (page === 'exams') { loadExams(); loadStudents(); }
+    if (page === 'students') { loadStudents(); loadTracks(); }
+    if (page === 'resources') { loadResources(); loadTracks(); }
+    if (page === 'exams') { loadExams(); loadStudents(); loadTracks(); }
     if (page === 'attempts') loadAttempts();
     if (page === 'monitoring') loadMonitoring();
     if (page === 'tracks') loadTracks();
     if (page === 'activities') { loadActivities(); loadTracks(); loadStudents(); loadPlatformQuestionBank(); }
     if (page === 'activity-submissions') loadActivitySubmissions();
-    if (page === 'question-bank') { loadPlatformQuestionBank(); loadResources(); loadStudents(); }
+    if (page === 'question-bank') { loadPlatformQuestionBank(); loadResources(); loadStudents(); loadTracks(); }
     if (page === 'questions' || page === 'practice' || page === 'review' || page === 'playground') {
       if (!state.catalogs.models) loadCatalog('models');
     }
@@ -880,7 +880,7 @@
         }).join('') : '<tr><td colspan="7" class="empty-cell">دانش‌آموزی پیدا نشد.</td></tr>';
       }
       const options = '<option value="">بانک عمومی / همه دانش‌آموزان</option>' + state.students.map(s=>'<option value="'+Number(s.id)+'">'+escapeHtml(s.name+' · '+s.username)+'</option>').join('');
-      ['#questionTargetStudent','#examTargetStudent'].forEach(selector => { if ($(selector)) { const current=$(selector).value; $(selector).innerHTML=options; if(current)$(selector).value=current; } });
+      ['#questionTargetStudent','#examTargetStudent','#activityTargetStudent'].forEach(selector => { if ($(selector)) { const current=$(selector).value; $(selector).innerHTML=options; if(current)$(selector).value=current; } });
     } catch(error) {
       if ($('#studentRows')) $('#studentRows').innerHTML='<tr><td colspan="7" class="empty-cell">'+escapeHtml(error.message)+'</td></tr>';
       toast(error.message,'error');
@@ -1085,6 +1085,18 @@
     $('#studentRows').addEventListener('click',async event=>{
       const statusButton=event.target.closest('[data-student-status]');
       const passwordButton=event.target.closest('[data-student-password]');
+      const editButton=event.target.closest('[data-student-edit]');
+      if(editButton){
+        const id=Number(editButton.dataset.studentEdit), row=state.students.find(item=>Number(item.id)===id);
+        if(!row)return;
+        const name=prompt('نام و نام خانوادگی:',row.name||'');if(name===null)return;
+        const level=prompt('سطح آموزشی:',row.level||'');if(level===null)return;
+        const group_name=prompt('کلاس / گروه:',row.group_name||'');if(group_name===null)return;
+        const phone=prompt('شماره تماس:',row.phone||'');if(phone===null)return;
+        try{await api('/platform/students/'+id,{method:'POST',body:json({name,level,group_name,phone})});await loadStudents();toast('اطلاعات دانش‌آموز به‌روزرسانی شد.','success');}
+        catch(error){toast(error.message,'error');}
+        return;
+      }
       if(passwordButton){
         const id=Number(passwordButton.dataset.studentPassword), password=prompt('رمز جدید (حداقل ۸ کاراکتر):');
         if(password===null)return;
