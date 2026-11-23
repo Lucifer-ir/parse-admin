@@ -22,7 +22,7 @@ function parse_student_from_token(PDO $pdo): ?array
     $student = $stmt->fetch();
     if (!$student) return null;
     $pdo->prepare('UPDATE student_auth_tokens SET last_used_at=UTC_TIMESTAMP() WHERE id=?')->execute([(int)$student['token_id']]);
-    $pdo->prepare('UPDATE students SET last_seen_at=UTC_TIMESTAMP(),last_seen_platform=? WHERE id=?')->execute([(int)$student['id']]);
+    $pdo->prepare('UPDATE students SET last_seen_at=UTC_TIMESTAMP() WHERE id=?')->execute([(int)$student['id']]);
     unset($student['token_id']);
     return $student;
 }
@@ -47,6 +47,8 @@ function parse_issue_student_token(PDO $pdo, int $studentId): string
 function parse_store_event(PDO $pdo, int $studentId, string $event, ?string $route, array $metadata = []): void
 {
     $json = json_encode($metadata, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    $pdo->prepare('UPDATE students SET last_seen_at=UTC_TIMESTAMP(),last_seen_platform=? WHERE id=?')
+        ->execute([substr((string)($metadata['platform'] ?? 'unknown'),0,40),$studentId]);
     $pdo->prepare(
         'INSERT INTO student_activity_events (student_id,event_type,route,metadata_json,ip_address,platform)
          VALUES (?,?,?,?,?,?)'
@@ -106,7 +108,6 @@ if ($method === 'POST' && $path === '/auth/login') {
         }
         unset($student['password_hash']);
         $token = parse_issue_student_token($pdo, (int)$student['id']);
-        $pdo->prepare('UPDATE students SET last_seen_at=UTC_TIMESTAMP(),last_seen_platform=? WHERE id=?')->execute([substr((string)($body['platform'] ?? 'unknown'),0,40),(int)$student['id']]);
         parse_store_event($pdo, (int)$student['id'], 'login', '/auth/login', ['platform' => $body['platform'] ?? 'unknown']);
         respond(200, ['token' => $token, 'user' => $student]);
     }
@@ -231,7 +232,7 @@ if ($method === 'POST' && preg_match('#^/activities/([1-9][0-9]*)/submit$#',$pat
         $objective=in_array($q['question_type'],['multiple_choice','true_false','fill_blank','ordering'],true);
         if($objective){
           $correct=json_decode((string)$q['answer_json'],true);
-          $norm=static fn($v)=>mb_strtolower(trim(is_scalar($v)?(string)$v:json_encode($v,JSON_UNESCAPED_UNICODE)));
+          $norm=static function($v){return is_array($v)?json_encode($v,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES):mb_strtolower(trim(is_scalar($v)?(string)$v:''));};
           $isCorrect=$norm($given)===$norm($correct);$awarded=$isCorrect?$points:0.0;$score+=$awarded;
         }else{$isCorrect=null;$awarded=null;$manual++;}
         $save->execute([$submissionId,$questionId,json_encode($given, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),$isCorrect===null?null:($isCorrect?1:0),$awarded]);
@@ -363,13 +364,17 @@ if ($method === 'POST' && preg_match('#^/exams/([1-9][0-9]*)/submit$#', $path, $
          WHERE a.attempt_id=?'
     );
     $rows->execute([$examId, $attemptId]);
-    $score = 0.0; $total = 0.0; $manual = 0;
+    $score = 0.0; $manual = 0;
+    $totalStmt = $pdo->prepare('SELECT COALESCE(SUM(points),0) FROM exam_questions WHERE exam_id=?');
+    $totalStmt->execute([$examId]);
+    $total = (float)$totalStmt->fetchColumn();
     foreach ($rows->fetchAll() as $row) {
-        $points = (float)$row['points']; $total += $points;
+        $points = (float)$row['points'];
         $given = json_decode((string)$row['answer_json'], true);
         $correct = json_decode((string)$row['correct_answer'], true);
         if (in_array($row['question_type'], ['multiple_choice','true_false','fill_blank','ordering'], true)) {
-            $isCorrect = mb_strtolower(trim((string)$given)) === mb_strtolower(trim((string)$correct));
+            $normalize = static function($value) { return is_array($value) ? json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : mb_strtolower(trim(is_scalar($value) ? (string)$value : '')); };
+            $isCorrect = $normalize($given) === $normalize($correct);
             $awarded = $isCorrect ? $points : 0.0; $score += $awarded;
             $pdo->prepare('UPDATE exam_answers SET is_correct=?,awarded_points=? WHERE id=?')
                 ->execute([$isCorrect ? 1 : 0, $awarded, (int)$row['id']]);
