@@ -444,7 +444,7 @@ if ($method === 'GET' && preg_match('#^/platform/activity-submissions/([1-9][0-9
     $id=(int)$m[1];
     $head=app_db()->prepare('SELECT sub.*,a.title activity_title,s.name student_name,s.username FROM activity_submissions sub JOIN learning_activities a ON a.id=sub.activity_id JOIN students s ON s.id=sub.student_id WHERE sub.id=?');
     $head->execute([$id]);$submission=$head->fetch();if(!$submission)app_json(404,['error'=>'پاسخ تمرین پیدا نشد.']);
-    $rows=app_db()->prepare('SELECT aa.id,q.question_text,q.question_type,q.options_json,q.answer_json correct_answer,aa.answer_json student_answer,aa.is_correct,aa.awarded_points,aa.teacher_feedback,q.points AS points,sar.id AS audio_response_id,sar.mime_type AS audio_mime_type,sar.original_filename AS audio_filename FROM activity_answers aa JOIN question_bank q ON q.id=aa.question_id JOIN activity_questions aq ON aq.question_id=q.id AND aq.activity_id=? JOIN activity_submissions sub ON sub.id=aa.submission_id LEFT JOIN student_audio_responses sar ON sar.student_id=sub.student_id AND sar.context_type='activity' AND sar.context_id=sub.activity_id AND sar.question_id=q.id WHERE aa.submission_id=? ORDER BY aq.position');
+    $rows=app_db()->prepare("SELECT aa.id,q.question_text,q.question_type,q.options_json,q.answer_json correct_answer,aa.answer_json student_answer,aa.is_correct,aa.awarded_points,aa.teacher_feedback,q.points AS points,sar.id AS audio_response_id,sar.mime_type AS audio_mime_type,sar.original_filename AS audio_filename FROM activity_answers aa JOIN question_bank q ON q.id=aa.question_id JOIN activity_questions aq ON aq.question_id=q.id AND aq.activity_id=? JOIN activity_submissions sub ON sub.id=aa.submission_id LEFT JOIN student_audio_responses sar ON sar.student_id=sub.student_id AND sar.context_type='activity' AND sar.context_id=sub.activity_id AND sar.question_id=q.id WHERE aa.submission_id=? ORDER BY aq.position");
     $rows->execute([(int)$submission['activity_id'],$id]);
     app_json(200,['submission'=>$submission,'answers'=>$rows->fetchAll()]);
 }
@@ -989,14 +989,14 @@ if ($method === 'GET' && preg_match('#^/platform/attempts/([1-9][0-9]*)$#',$path
     );
     $head->execute([$id]);$attempt=$head->fetch();if(!$attempt)app_json(404,['error'=>'پاسخ‌نامه پیدا نشد.']);
     $answers=app_db()->prepare(
-      'SELECT q.id AS question_id,q.question_text,q.question_type,q.options_json,q.audio_url,q.answer_json AS correct_answer,
+      "SELECT q.id AS question_id,q.question_text,q.question_type,q.options_json,q.audio_url,q.answer_json AS correct_answer,
               a.answer_json AS student_answer,a.is_correct,a.awarded_points,a.teacher_feedback,eq.points,
               sar.id AS audio_response_id,sar.mime_type AS audio_mime_type,sar.original_filename AS audio_filename
        FROM exam_answers a JOIN question_bank q ON q.id=a.question_id
        JOIN exam_questions eq ON eq.exam_id=? AND eq.question_id=q.id
        JOIN exam_attempts attempt ON attempt.id=a.attempt_id
        LEFT JOIN student_audio_responses sar ON sar.student_id=attempt.student_id AND sar.context_type='exam' AND sar.context_id=attempt.exam_id AND sar.question_id=q.id
-       WHERE a.attempt_id=? ORDER BY eq.position'
+       WHERE a.attempt_id=? ORDER BY eq.position"
     );
     $answers->execute([(int)$attempt['exam_id'],$id]);
     app_json(200,['attempt'=>$attempt,'answers'=>$answers->fetchAll()]);
