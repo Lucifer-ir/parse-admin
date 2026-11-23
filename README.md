@@ -154,11 +154,11 @@ Batch متنی فایل JSONL، استریم، لغو یا چند مدل در ی
 - `POST /api/ai/batches`, `GET /api/ai/batches/{id}`
 - `POST /api/ai/image-batches`, `GET|DELETE /api/ai/image-batches/{id}`
 - `GET /api/generation?id=...`, `GET /api/usage`, `GET /api/usage.csv`
-- `GET /api/history`, `POST /api/questions/save`
+- `GET /api/history`, `POST /api/questions/save`\n- `GET /api/questions`, `DELETE /api/questions/{id}`، `GET /api/users` و `POST /api/users/{id}/status`\n- `GET /api/prompts` و `POST /api/prompts` برای مدیریت System Promptها
 
 ## دیتابیس و migration
 
-فایل `backend/migrations/20261123_ai_console.sql` جداول تنظیمات Provider، گزارش مصرف، تاریخچه تولید و قالب‌های prompt را به‌صورت افزایشی ایجاد می‌کند.
+فایل‌های `backend/migrations/*.sql` جداول تنظیمات Provider، گزارش مصرف، metadata صورتحساب، تاریخچه تولید و قالب‌های prompt را به‌صورت افزایشی ایجاد می‌کنند. اسکریپت آپدیت همه migrationها را به ترتیب نام فایل اجرا می‌کند.
 
 جداول اصلی:
 - `users`, `auth_tokens`, `login_attempts`, `questions`, `sources`, `admin_audit_log`
