@@ -457,7 +457,7 @@ if ($method === 'GET' && $path === '/platform/students') {
     $sqlWhere = $where ? ' WHERE ' . implode(' AND ', $where) : '';
     $stmt = app_db()->prepare(
         'SELECT s.id,s.username,s.student_code,s.phone,s.name,s.email,s.status,s.level,s.group_name,s.track_id,t.track_title,t.course_title,t.level_code track_level,s.last_seen_at,s.last_seen_platform,s.created_at
-         FROM students s LEFT JOIN learning_tracks t ON t.id=s.track_id' . $sqlWhere.replace(/\b(username|name|phone|student_code|email|status)\b/g,'s.$1') . ' ORDER BY id DESC LIMIT ? OFFSET ?'
+         FROM students s LEFT JOIN learning_tracks t ON t.id=s.track_id' . $sqlWhere . ' ORDER BY s.id DESC LIMIT ? OFFSET ?'
     );
     foreach ($params as $i => $value) $stmt->bindValue($i + 1, $value);
     $stmt->bindValue(count($params) + 1, $limit, PDO::PARAM_INT);
@@ -759,11 +759,11 @@ if ($method === 'DELETE' && preg_match('#^/platform/questions/([1-9][0-9]*)$#', 
 if ($method === 'GET' && $path === '/platform/exams') {
     $rows=app_db()->query(
       'SELECT e.id,e.title,e.subject,e.level,e.track_id,e.duration_minutes,e.starts_at,e.ends_at,e.status,e.passing_score,
-              s.name AS student_name,COUNT(eq.question_id) AS question_count,COUNT(a.id) AS attempt_count
+              s.name AS student_name,
+              (SELECT COUNT(*) FROM exam_questions eq WHERE eq.exam_id=e.id) AS question_count,
+              (SELECT COUNT(*) FROM exam_attempts a WHERE a.exam_id=e.id) AS attempt_count
        FROM exams e LEFT JOIN students s ON s.id=e.target_student_id
-       LEFT JOIN exam_questions eq ON eq.exam_id=e.id
-       LEFT JOIN exam_attempts a ON a.exam_id=e.id
-       GROUP BY e.id ORDER BY e.id DESC'
+       ORDER BY e.id DESC'
     )->fetchAll();
     app_json(200,['rows'=>$rows]);
 }
@@ -782,7 +782,7 @@ if ($method === 'POST' && $path === '/platform/exams') {
       $pdo->prepare('INSERT INTO exams(title,description,subject,level,track_id,duration_minutes,starts_at,ends_at,target_student_id,shuffle_questions,shuffle_options,show_result,passing_score,status,created_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
         ->execute([$title,trim((string)($body['description']??''))?:null,trim((string)($body['subject']??''))?:null,trim((string)($body['level']??''))?:null,!empty($body['track_id'])?(int)$body['track_id']:null,$duration,$start,$end,!empty($body['target_student_id'])?(int)$body['target_student_id']:null,!empty($body['shuffle_questions'])?1:0,!empty($body['shuffle_options'])?1:0,!empty($body['show_result'])?1:0,max(0,min(100,(float)($body['passing_score']??50))),$status,(int)$admin['id']]);
       $examId=(int)$pdo->lastInsertId();
-      $validStmt=$pdo->prepare('SELECT id FROM question_bank WHERE id=?');
+      $validStmt=$pdo->prepare('SELECT id FROM question_bank WHERE id=? AND status=\'published\'');
       $link=$pdo->prepare('INSERT INTO exam_questions(exam_id,question_id,position,points) VALUES(?,?,?,?)');
       foreach($questionIds as $position=>$qid){
         $validStmt->execute([$qid]);if(!$validStmt->fetchColumn())throw new InvalidArgumentException('یکی از سؤال‌های انتخاب‌شده در بانک سؤال وجود ندارد.');
