@@ -357,7 +357,16 @@ if ($method === 'POST' && preg_match('#^/platform/activity-answers/([1-9][0-9]*)
     $pdo->prepare('UPDATE activity_answers SET awarded_points=?,teacher_feedback=? WHERE id=?')->execute([$points,$feedback?:null,$answerId]);
     $sum=$pdo->prepare('SELECT COALESCE(SUM(awarded_points),0) FROM activity_answers WHERE submission_id=?');$sum->execute([(int)$answer['submission_id']]);$score=(float)$sum->fetchColumn();
     $total=$pdo->prepare('SELECT COALESCE(SUM(points),0) FROM activity_questions WHERE activity_id=?');$total->execute([(int)$max['activity_id']]);$totalPoints=(float)$total->fetchColumn();
-    $pdo->prepare("UPDATE activity_submissions SET score=?,total_points=?,status='reviewed' WHERE id=?")->execute([$score,$totalPoints,(int)$answer['submission_id']]);
+    $pending=$pdo->prepare('SELECT COUNT(*) FROM activity_answers WHERE submission_id=? AND is_correct IS NULL AND awarded_points IS NULL');
+    $pending->execute([(int)$answer['submission_id']]);
+    $reviewStatus=(int)$pending->fetchColumn()===0?'reviewed':'submitted';
+    $pdo->prepare('UPDATE activity_submissions SET score=?,total_points=?,status=? WHERE id=?')->execute([$score,$totalPoints,$reviewStatus,(int)$answer['submission_id']]);
+    if($reviewStatus==='reviewed') {
+      $assignment=$pdo->prepare('SELECT activity_id,student_id FROM activity_submissions WHERE id=?');
+      $assignment->execute([(int)$answer['submission_id']]);
+      $assignmentRow=$assignment->fetch();
+      if($assignmentRow) app_db()->prepare("UPDATE student_activity_assignments SET status='reviewed' WHERE activity_id=? AND student_id=?")->execute([(int)$assignmentRow['activity_id'],(int)$assignmentRow['student_id']]);
+    }
     app_json(200,['ok'=>true,'score'=>$score,'total_points'=>$totalPoints]);
 }
 
@@ -810,7 +819,7 @@ if ($method === 'GET' && $path === '/platform/attempts') {
               e.title AS exam_title,s.name AS student_name,s.username,
               (SELECT COUNT(*) FROM exam_answers ans WHERE ans.attempt_id=a.id) AS answered_count,
               (SELECT COUNT(*) FROM exam_questions eq WHERE eq.exam_id=a.exam_id) AS question_count,
-              (SELECT COUNT(*) FROM exam_answers ans WHERE ans.attempt_id=a.id AND ans.is_correct IS NULL) AS pending_review
+              (SELECT COUNT(*) FROM exam_answers ans WHERE ans.attempt_id=a.id AND ans.is_correct IS NULL AND ans.awarded_points IS NULL) AS pending_review
        FROM exam_attempts a INNER JOIN exams e ON e.id=a.exam_id INNER JOIN students s ON s.id=a.student_id
        ORDER BY a.id DESC LIMIT 500'
     )->fetchAll();
@@ -848,7 +857,10 @@ if ($method === 'POST' && preg_match('#^/platform/answers/([1-9][0-9]*)/grade$#'
     $sum=$pdo->prepare('SELECT COALESCE(SUM(awarded_points),0) score FROM exam_answers WHERE attempt_id=?');
     $sum->execute([(int)$answer['attempt_id']]);$score=(float)$sum->fetchColumn();
     $total=$pdo->prepare('SELECT COALESCE(SUM(points),0) FROM exam_questions WHERE exam_id=?');$total->execute([(int)$max['exam_id']]);$totalPoints=(float)$total->fetchColumn();
-    $pdo->prepare("UPDATE exam_attempts SET score=?,total_points=?,status='reviewed' WHERE id=?")->execute([$score,$totalPoints,(int)$answer['attempt_id']]);
+    $pending=$pdo->prepare('SELECT COUNT(*) FROM exam_answers WHERE attempt_id=? AND is_correct IS NULL AND awarded_points IS NULL');
+    $pending->execute([(int)$answer['attempt_id']]);
+    $reviewStatus=(int)$pending->fetchColumn()===0?'reviewed':'submitted';
+    $pdo->prepare('UPDATE exam_attempts SET score=?,total_points=?,status=? WHERE id=?')->execute([$score,$totalPoints,$reviewStatus,(int)$answer['attempt_id']]);
     app_json(200,['ok'=>true,'score'=>$score,'total_points'=>$totalPoints]);
 }
 
