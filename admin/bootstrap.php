@@ -163,7 +163,7 @@ function admin_ai_secret(PDO $pdo): string
 function admin_ai_call(PDO $pdo, string $operation, string $method, string $path, ?array $body = null, int $timeout = 90): array
 {
     $settings = admin_ai_settings($pdo);
-    if (empty($settings['enabled'])) {
+    if (empty($settings['enabled']) && $operation !== 'provider.test') {
         throw new RuntimeException('اتصال هوش مصنوعی غیرفعال است. ابتدا آن را در تنظیمات فعال کنید.');
     }
     $apiKey = admin_decrypt_secret($settings['api_key_cipher'] ?? null);
