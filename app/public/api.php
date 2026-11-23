@@ -242,22 +242,64 @@ function platform_json_value(mixed $value): ?string
 }
 
 
+if ($method === 'GET' && $path === '/platform/education-catalog') {
+    $languages=app_db()->query("SELECT language_code,language_name,native_name FROM learning_languages WHERE active=1 ORDER BY sort_order,language_name")->fetchAll();
+    $levels=app_db()->query("SELECT language_code,level_code,level_name,level_order FROM learning_levels WHERE active=1 ORDER BY language_code,level_order")->fetchAll();
+    $classTypes=app_db()->query("SELECT id,code,title,description FROM class_types WHERE active=1 ORDER BY sort_order,title")->fetchAll();
+    app_json(200,['languages'=>$languages,'levels'=>$levels,'class_types'=>$classTypes]);
+}
+
 if ($method === 'GET' && $path === '/platform/tracks') {
-    $rows=app_db()->query('SELECT id,language_code,language_name,track_title,course_title,level_code,description,active,created_at FROM learning_tracks ORDER BY language_name,track_title,course_title,level_code')->fetchAll();
+    $rows=app_db()->query(
+      'SELECT t.id,t.language_code,l.language_name,t.track_title,t.course_title,t.level_code,t.class_type_id,ct.title AS class_type_title,t.description,t.active,t.created_at
+       FROM learning_tracks t
+       LEFT JOIN learning_languages l ON l.language_code=t.language_code
+       LEFT JOIN class_types ct ON ct.id=t.class_type_id
+       ORDER BY l.sort_order,t.track_title,t.course_title,t.level_code'
+    )->fetchAll();
     app_json(200,['rows'=>$rows]);
+}
+
+if ($method === 'POST' && $path === '/platform/class-types') {
+    $body=app_request_json();
+    $code=strtolower(trim((string)($body['code']??'')));
+    $title=trim((string)($body['title']??''));
+    $description=trim((string)($body['description']??''));
+    if(!preg_match('/^[a-z][a-z0-9_-]{1,39}$/',$code)||$title===''||mb_strlen($title)>120)app_json(422,['error'=>'شناسه انگلیسی و عنوان نوع کلاس را معتبر وارد کنید.']);
+    try {
+      $stmt=app_db()->prepare('INSERT INTO class_types(code,title,description,sort_order,active) VALUES(?,?,?,?,1)');
+      $stmt->execute([$code,$title,$description?:null,100]);
+    } catch(PDOException $e) {
+      if((string)$e->getCode()==='23000')app_json(409,['error'=>'این شناسه نوع کلاس قبلاً ثبت شده است.']);
+      throw $e;
+    }
+    app_json(201,['ok'=>true,'id'=>(int)app_db()->lastInsertId()]);
+}
+
+if ($method === 'POST' && preg_match('#^/platform/class-types/([1-9][0-9]*)/status$#',$path,$m)) {
+    $active=!empty(app_request_json()['active'])?1:0;
+    app_db()->prepare('UPDATE class_types SET active=? WHERE id=?')->execute([$active,(int)$m[1]]);
+    app_json(200,['ok'=>true,'active'=>(bool)$active]);
 }
 
 if ($method === 'POST' && $path === '/platform/tracks') {
     $body=app_request_json();
     $languageCode=strtolower(trim((string)($body['language_code']??'')));
-    $languageName=trim((string)($body['language_name']??''));
     $trackTitle=trim((string)($body['track_title']??''));
     $courseTitle=trim((string)($body['course_title']??''));
-    $levelCode=trim((string)($body['level_code']??''));
-    if(!preg_match('/^[a-z]{2,16}$/',$languageCode)||$languageName===''||$trackTitle===''||$courseTitle===''||$levelCode==='')app_json(422,['error'=>'زبان، رشته، دوره و سطح را کامل وارد کنید.']);
+    $levelCode=strtoupper(trim((string)($body['level_code']??'')));
+    $classTypeId=!empty($body['class_type_id'])?(int)$body['class_type_id']:null;
+    if($trackTitle===''||$courseTitle===''||$levelCode==='')app_json(422,['error'=>'زبان، رشته، دوره و سطح را کامل وارد کنید.']);
+    $lang=app_db()->prepare('SELECT language_name FROM learning_languages WHERE language_code=? AND active=1 LIMIT 1');
+    $lang->execute([$languageCode]);$languageName=$lang->fetchColumn();
+    if(!$languageName)app_json(422,['error'=>'زبان انتخاب‌شده معتبر یا فعال نیست.']);
+    $level=app_db()->prepare('SELECT id FROM learning_levels WHERE language_code=? AND level_code=? AND active=1 LIMIT 1');
+    $level->execute([$languageCode,$levelCode]);
+    if(!$level->fetchColumn())app_json(422,['error'=>'سطح انتخاب‌شده در کاتالوگ این زبان تعریف نشده است.']);
+    if($classTypeId!==null){$check=app_db()->prepare('SELECT id FROM class_types WHERE id=? AND active=1');$check->execute([$classTypeId]);if(!$check->fetchColumn())app_json(422,['error'=>'نوع کلاس انتخاب‌شده معتبر نیست.']);}
     try{
-      $stmt=app_db()->prepare('INSERT INTO learning_tracks(language_code,language_name,track_title,course_title,level_code,description,active) VALUES(?,?,?,?,?,?,1)');
-      $stmt->execute([$languageCode,$languageName,$trackTitle,$courseTitle,$levelCode,trim((string)($body['description']??''))?:null]);
+      $stmt=app_db()->prepare('INSERT INTO learning_tracks(language_code,language_name,track_title,course_title,level_code,class_type_id,description,active) VALUES(?,?,?,?,?,?,?,1)');
+      $stmt->execute([$languageCode,$languageName,$trackTitle,$courseTitle,$levelCode,$classTypeId,trim((string)($body['description']??''))?:null]);
     }catch(PDOException $e){if((string)$e->getCode()==='23000')app_json(409,['error'=>'این ترکیب زبان، رشته، دوره و سطح قبلاً تعریف شده است.']);throw $e;}
     app_json(201,['ok'=>true,'id'=>(int)app_db()->lastInsertId()]);
 }
@@ -465,8 +507,8 @@ if ($method === 'GET' && $path === '/platform/students') {
     }
     $sqlWhere = $where ? ' WHERE ' . implode(' AND ', $where) : '';
     $stmt = app_db()->prepare(
-        'SELECT s.id,s.username,s.student_code,s.phone,s.name,s.email,s.status,s.level,s.group_name,s.track_id,t.track_title,t.course_title,t.level_code track_level,s.last_seen_at,s.last_seen_platform,s.created_at
-         FROM students s LEFT JOIN learning_tracks t ON t.id=s.track_id' . $sqlWhere . ' ORDER BY s.id DESC LIMIT ? OFFSET ?'
+        'SELECT s.id,s.username,s.student_code,s.phone,s.name,s.email,s.status,s.level,s.group_name,s.track_id,t.language_code,l.language_name,t.track_title,t.course_title,t.level_code track_level,t.class_type_id,ct.title class_type_title,s.last_seen_at,s.last_seen_platform,s.created_at
+         FROM students s LEFT JOIN learning_tracks t ON t.id=s.track_id LEFT JOIN learning_languages l ON l.language_code=t.language_code LEFT JOIN class_types ct ON ct.id=t.class_type_id' . $sqlWhere . ' ORDER BY s.id DESC LIMIT ? OFFSET ?'
     );
     foreach ($params as $i => $value) $stmt->bindValue($i + 1, $value);
     $stmt->bindValue(count($params) + 1, $limit, PDO::PARAM_INT);
@@ -505,10 +547,11 @@ if ($method === 'POST' && $path === '/platform/students') {
         $check->execute([$value]);
         if($check->fetchColumn()) app_json(409,['error'=>"{$label} قبلاً ثبت شده است."]);
     }
+    $resolvedLevel=null;
     if($trackId!==null){
-        $check=$pdo->prepare('SELECT id FROM learning_tracks WHERE id=? AND active=1');
-        $check->execute([$trackId]);
-        if(!$check->fetchColumn()) app_json(422,['error'=>'مسیر آموزشی انتخاب‌شده معتبر نیست یا غیرفعال است.']);
+        $check=$pdo->prepare('SELECT t.level_code FROM learning_tracks t JOIN learning_levels lv ON lv.language_code=t.language_code AND lv.level_code=t.level_code AND lv.active=1 WHERE t.id=? AND t.active=1');
+        $check->execute([$trackId]);$resolvedLevel=$check->fetchColumn();
+        if(!$resolvedLevel)app_json(422,['error'=>'مسیر آموزشی یا سطح آن معتبر و فعال نیست.']);
     }
 
     try{
@@ -518,7 +561,7 @@ if ($method === 'POST' && $path === '/platform/students') {
       $stmt->execute([
         $username,$code!==''?$code:null,$phone!==''?$phone:null,$name,$email!==''?$email:null,$hash,
         $studentStatus,
-        trim((string)($body['level']??''))?:null,trim((string)($body['group_name']??''))?:null,$trackId
+        $resolvedLevel,trim((string)($body['group_name']??''))?:null,$trackId
       ]);
       $studentId=(int)$pdo->lastInsertId();
       // Mobile authentication uses students + student_auth_tokens, not the admin users table.
@@ -558,19 +601,32 @@ if ($method === 'POST' && preg_match('#^/platform/students/([1-9][0-9]*)/passwor
 }
 
 if ($method === 'POST' && preg_match('#^/platform/students/([1-9][0-9]*)$#', $path, $m)) {
-    $id = (int)$m[1]; $body = app_request_json();
-    $allowed = ['name','phone','email','student_code','level','group_name','track_id'];
-    $sets = []; $values = [];
-    foreach ($allowed as $field) {
-        if (array_key_exists($field, $body)) {
-            $sets[] = $field . '=?';
-            $values[] = trim((string)$body[$field]) !== '' ? trim((string)$body[$field]) : null;
-        }
+    $id=(int)$m[1];$body=app_request_json();$pdo=app_db();
+    $exists=$pdo->prepare('SELECT id FROM students WHERE id=?');$exists->execute([$id]);
+    if(!$exists->fetchColumn())app_json(404,['error'=>'دانش‌آموز پیدا نشد.']);
+    $sets=[];$values=[];
+    foreach(['name','phone','email','student_code','group_name'] as $field){
+      if(array_key_exists($field,$body)){
+        $value=trim((string)$body[$field]);
+        if($field==='name'&&$value==='')app_json(422,['error'=>'نام دانش‌آموز نمی‌تواند خالی باشد.']);
+        if($field==='phone'&&$value!==''&&!preg_match('/^[0-9+() -]{8,20}$/',$value))app_json(422,['error'=>'شماره تماس معتبر نیست.']);
+        $sets[]=$field.'=?';$values[]=$value!==''?$value:null;
+      }
     }
-    if (!$sets) app_json(422, ['error' => 'هیچ فیلد قابل تغییری ارسال نشده است.']);
-    $values[] = $id;
-    app_db()->prepare('UPDATE students SET ' . implode(',', $sets) . ' WHERE id=?')->execute($values);
-    app_json(200, ['ok' => true]);
+    if(array_key_exists('track_id',$body)){
+      $trackId=trim((string)$body['track_id'])!==''?(int)$body['track_id']:null;
+      $levelCode=null;
+      if($trackId!==null){
+        $track=$pdo->prepare('SELECT t.level_code FROM learning_tracks t JOIN learning_levels lv ON lv.language_code=t.language_code AND lv.level_code=t.level_code AND lv.active=1 WHERE t.id=? AND t.active=1 LIMIT 1');
+        $track->execute([$trackId]);$levelCode=$track->fetchColumn();
+        if(!$levelCode)app_json(422,['error'=>'مسیر آموزشی یا سطح آن فعال و معتبر نیست.']);
+      }
+      $sets[]='track_id=?';$values[]=$trackId;
+      $sets[]='level=?';$values[]=$levelCode;
+    }
+    if(!$sets)app_json(422,['error'=>'هیچ فیلد قابل تغییری ارسال نشده است.']);
+    $values[]=$id;$pdo->prepare('UPDATE students SET '.implode(',',$sets).' WHERE id=?')->execute($values);
+    app_json(200,['ok'=>true]);
 }
 
 if ($method === 'GET' && $path === '/platform/resources') {
