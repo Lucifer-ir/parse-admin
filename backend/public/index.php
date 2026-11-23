@@ -126,13 +126,19 @@ if ($method === 'POST' && $path === '/auth/login') {
         respond(422, ['detail' => 'Enter a valid email and password.']);
     }
 
-    $limit = $pdo->prepare(
+    $ipLimit = $pdo->prepare(
         'SELECT COUNT(*) FROM login_attempts
-         WHERE success = 0 AND created_at >= (UTC_TIMESTAMP() - INTERVAL 15 MINUTE)
-           AND (ip_address = ? OR email = ?)'
+         WHERE success = 0 AND ip_address = ?
+           AND created_at >= (UTC_TIMESTAMP() - INTERVAL 15 MINUTE)'
     );
-    $limit->execute([$ip, $email]);
-    if ((int)$limit->fetchColumn() >= 12) {
+    $ipLimit->execute([$ip]);
+    $pairLimit = $pdo->prepare(
+        'SELECT COUNT(*) FROM login_attempts
+         WHERE success = 0 AND ip_address = ? AND email = ?
+           AND created_at >= (UTC_TIMESTAMP() - INTERVAL 15 MINUTE)'
+    );
+    $pairLimit->execute([$ip, $email]);
+    if ((int)$ipLimit->fetchColumn() >= 60 || (int)$pairLimit->fetchColumn() >= 10) {
         header('Retry-After: 900');
         respond(429, ['detail' => 'Too many login attempts. Try again later.']);
     }
