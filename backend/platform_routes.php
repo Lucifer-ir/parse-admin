@@ -203,7 +203,7 @@ if ($method === 'POST' && preg_match('#^/activities/([1-9][0-9]*)/submit$#',$pat
     $assignment=$pdo->prepare(
       'SELECT a.id,a.due_at FROM learning_activities a
        JOIN student_activity_assignments saa ON saa.activity_id=a.id
-       WHERE a.id=? AND saa.student_id=? AND a.status=\'published\' AND (a.track_id IS NULL OR a.track_id=?) LIMIT 1'
+       WHERE a.id=? AND saa.student_id=? AND a.status=\'published\' AND (a.track_id IS NULL OR a.track_id=?) AND (a.level IS NULL OR a.level=\'\' OR a.level=?) LIMIT 1'
     );
     $assignment->execute([$activityId,(int)$student['id'],(int)($student['track_id'] ?? 0),(string)($student['level'] ?? '')]);$activity=$assignment->fetch();
     if(!$activity)respond(404,['message'=>'این تمرین برای حساب شما در دسترس نیست.']);
