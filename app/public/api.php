@@ -32,11 +32,21 @@ function ai_record_usage(array $admin, string $operation, string $endpoint, ?str
     $requestId = $headers['x-paasta-request-id'] ?? ($data['paasta']['request_id'] ?? null);
     $charged = $data['paasta']['charged_toman'] ?? ($headers['x-paasta-charged-toman'] ?? null);
     $errorCode = $data['error']['code'] ?? ($data['code'] ?? null);
+    // Keep raw billing/usage metadata for reconciliation, but never store prompt or completion text here.
+    $providerMeta = [
+        'paasta' => $data['paasta'] ?? null,
+        'usage' => $usage,
+        'headers' => array_intersect_key($headers, array_flip([
+            'x-paasta-request-id','x-paasta-charged-toman','retry-after',
+            'x-ratelimit-limit','x-ratelimit-remaining','x-ratelimit-reset'
+        ])),
+    ];
+    $providerMetaJson = json_encode($providerMeta, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
     $stmt = app_db()->prepare(
         'INSERT INTO ai_usage_logs
-        (admin_user_id,operation,endpoint,model,request_id,status_code,input_tokens,output_tokens,total_tokens,cached_input_tokens,charged_toman,latency_ms,error_code)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)'
+        (admin_user_id,operation,endpoint,model,request_id,status_code,input_tokens,output_tokens,total_tokens,cached_input_tokens,charged_toman,latency_ms,error_code,provider_meta_json)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
     );
     $stmt->execute([
         (int)$admin['id'], $operation, $endpoint, $model,
@@ -49,6 +59,7 @@ function ai_record_usage(array $admin, string $operation, string $endpoint, ?str
         is_numeric($charged) ? (string)$charged : null,
         max(0, $latency),
         is_string($errorCode) ? substr($errorCode, 0, 100) : null,
+        is_string($providerMetaJson) ? $providerMetaJson : null,
     ]);
 }
 
@@ -226,7 +237,7 @@ if ($method === 'GET' && $path === '/dashboard') {
     $month = $pdo->query("SELECT COUNT(*) requests,COALESCE(SUM(charged_toman),0) cost,COALESCE(SUM(total_tokens),0) tokens FROM ai_usage_logs WHERE created_at >= DATE_FORMAT(CURDATE(),'%Y-%m-01')")->fetch();
     $totals = $pdo->query('SELECT COUNT(*) requests,COALESCE(SUM(charged_toman),0) cost,COALESCE(SUM(total_tokens),0) tokens FROM ai_usage_logs')->fetch();
     $models = $pdo->query('SELECT model,COUNT(*) requests,COALESCE(SUM(charged_toman),0) cost FROM ai_usage_logs WHERE model IS NOT NULL GROUP BY model ORDER BY requests DESC LIMIT 6')->fetchAll();
-    $recent = $pdo->query('SELECT operation,model,status_code,total_tokens,charged_toman,latency_ms,request_id,created_at FROM ai_usage_logs ORDER BY id DESC LIMIT 12')->fetchAll();
+    $recent = $pdo->query('SELECT operation,model,status_code,input_tokens,output_tokens,total_tokens,cached_input_tokens,charged_toman,latency_ms,request_id,provider_meta_json,created_at FROM ai_usage_logs ORDER BY id DESC LIMIT 12')->fetchAll();
     $users = (int)$pdo->query('SELECT COUNT(*) FROM users')->fetchColumn();
     $questions = (int)$pdo->query('SELECT COUNT(*) FROM questions')->fetchColumn();
     app_json(200, ['today'=>$today,'month'=>$month,'totals'=>$totals,'models'=>$models,'recent'=>$recent,'users'=>$users,'questions'=>$questions]);
@@ -367,30 +378,31 @@ if ($method === 'GET' && $path === '/usage') {
     $from = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['from'] ?? '')) ? $_GET['from'] : date('Y-m-01');
     $to = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['to'] ?? '')) ? $_GET['to'] : date('Y-m-d');
     $stmt = app_db()->prepare(
-        'SELECT id,operation,endpoint,model,request_id,status_code,input_tokens,output_tokens,total_tokens,cached_input_tokens,charged_toman,latency_ms,error_code,created_at
+        'SELECT id,operation,endpoint,model,request_id,status_code,input_tokens,output_tokens,total_tokens,cached_input_tokens,charged_toman,latency_ms,error_code,provider_meta_json,created_at
          FROM ai_usage_logs WHERE created_at >= ? AND created_at < DATE_ADD(?,INTERVAL 1 DAY)
          ORDER BY id DESC LIMIT 2000'
     );
     $stmt->execute([$from,$to]);
     $rows = $stmt->fetchAll();
-    $sum = ['requests'=>count($rows),'cost'=>0.0,'tokens'=>0];
+    $sum = ['requests'=>count($rows),'cost'=>0.0,'tokens'=>0,'cached_tokens'=>0];
     foreach ($rows as $row) {
         $sum['cost'] += (float)($row['charged_toman'] ?? 0);
         $sum['tokens'] += (int)($row['total_tokens'] ?? 0);
+        $sum['cached_tokens'] += (int)($row['cached_input_tokens'] ?? 0);
     }
     app_json(200, ['summary'=>$sum,'rows'=>$rows,'from'=>$from,'to'=>$to]);
 }
 
 if ($method === 'GET' && $path === '/usage.csv') {
     $stmt = app_db()->query(
-        'SELECT created_at,operation,endpoint,model,request_id,status_code,input_tokens,output_tokens,total_tokens,cached_input_tokens,charged_toman,latency_ms,error_code
+        'SELECT created_at,operation,endpoint,model,request_id,status_code,input_tokens,output_tokens,total_tokens,cached_input_tokens,charged_toman,latency_ms,error_code,provider_meta_json
          FROM ai_usage_logs ORDER BY id DESC LIMIT 10000'
     );
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename="parse-ai-usage.csv"');
     echo "\xEF\xBB\xBF";
     $out = fopen('php://output','w');
-    fputcsv($out,['created_at','operation','endpoint','model','request_id','status_code','input_tokens','output_tokens','total_tokens','cached_input_tokens','charged_toman','latency_ms','error_code']);
+    fputcsv($out,['created_at','operation','endpoint','model','request_id','status_code','input_tokens','output_tokens','total_tokens','cached_input_tokens','charged_toman','latency_ms','error_code','provider_meta_json']);
     while ($row = $stmt->fetch()) fputcsv($out,$row);
     fclose($out);
     exit;
