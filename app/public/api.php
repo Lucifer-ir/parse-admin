@@ -556,15 +556,37 @@ if ($method === 'POST' && $path === '/ai/image-edit') {
 }
 
 if ($method === 'POST' && $path === '/ai/transcription') {
-    if(empty($_FILES['audio'])||$_FILES['audio']['error']!==UPLOAD_ERR_OK) app_json(422,['error'=>'فایل صوتی را انتخاب کنید.']);
-    $file=$_FILES['audio'];
-    if((int)$file['size']>20*1024*1024) app_json(413,['error'=>'فایل صوتی حداکثر ۲۰ مگابایت باشد.']);
-    $model=trim((string)($_POST['model']??''));
-    if($model==='') app_json(422,['error'=>'مدل تبدیل صوت را انتخاب کنید.']);
-    $mime=function_exists('mime_content_type')?(mime_content_type($file['tmp_name'])?:'application/octet-stream'):'application/octet-stream';
-    $payload=['model'=>$model,'file'=>new CURLFile($file['tmp_name'],$mime,basename((string)$file['name']))];
-    if(!empty($_POST['language'])) $payload['language']=preg_replace('/[^a-z-]/i','',(string)$_POST['language']);
-    $call=ai_paasta_call($admin,'audio_transcription','POST','/audio/transcriptions',null,$payload,360);
+    if (!function_exists('curl_init')) app_json(500,['error'=>'افزونه cURL نصب نیست.']);
+    if (!empty($_FILES['audio']) && $_FILES['audio']['error'] === UPLOAD_ERR_OK) {
+        $file=$_FILES['audio'];
+        if((int)$file['size']>15*1024*1024) app_json(413,['error'=>'حجم فایل صوتی از محدودیت امن این پنل بیشتر است.']);
+        $model=trim((string)($_POST['model']??''));
+        if($model==='') app_json(422,['error'=>'مدل تبدیل صوت را انتخاب کنید.']);
+        $mime=function_exists('mime_content_type')?(mime_content_type($file['tmp_name'])?:'application/octet-stream'):'application/octet-stream';
+        $payload=['model'=>$model,'file'=>new CURLFile($file['tmp_name'],$mime,basename((string)$file['name']))];
+        if(!empty($_POST['language'])) $payload['language']=preg_replace('/[^a-z-]/i','',(string)$_POST['language']);
+        $call=ai_paasta_call($admin,'audio_transcription','POST','/audio/transcriptions',null,$payload,360);
+    } else {
+        $body=app_request_json();
+        $model=trim((string)($body['model']??''));
+        $inputAudio=$body['input_audio']??null;
+        if($model===''||!is_array($inputAudio)||empty($inputAudio['data'])||empty($inputAudio['format'])) {
+            app_json(422,['error'=>'مدل و input_audio با فیلدهای data و format الزامی هستند.']);
+        }
+        $base64=(string)$inputAudio['data'];
+        if(strlen($base64)>12*1024*1024||base64_decode($base64,true)===false) {
+            app_json(422,['error'=>'داده صوتی Base64 معتبر نیست یا بیش از حد بزرگ است.']);
+        }
+        $payload=[
+            'model'=>$model,
+            'input_audio'=>[
+                'data'=>$base64,
+                'format'=>preg_replace('/[^a-z0-9]/i','',(string)$inputAudio['format'])
+            ]
+        ];
+        if(!empty($body['language'])) $payload['language']=preg_replace('/[^a-z-]/i','',(string)$body['language']);
+        $call=ai_paasta_call($admin,'audio_transcription','POST','/audio/transcriptions',$payload,null,360);
+    }
     app_json(200,['data'=>$call['data'],'request_id'=>$call['headers']['x-paasta-request-id']??null]);
 }
 
