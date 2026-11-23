@@ -484,6 +484,8 @@ if ($method === 'POST' && $path === '/platform/students') {
     $code=trim((string)($body['student_code']??''));
     $email=trim((string)($body['email']??''));
     $trackId=!empty($body['track_id'])?(int)$body['track_id']:null;
+    $studentStatus=(string)($body['status']??'active');
+    if(!in_array($studentStatus,['active','disabled','pending'],true)) $studentStatus='active';
 
     if(!preg_match('/^[a-zA-Z0-9_.-]{3,100}$/',$username)||$name===''||strlen($password)<8||mb_strlen($name)>200)
         app_json(422,['error'=>'نام، نام کاربری معتبر و رمز عبور حداقل ۸ کاراکتری الزامی است.']);
@@ -515,7 +517,7 @@ if ($method === 'POST' && $path === '/platform/students') {
       $stmt=$pdo->prepare('INSERT INTO students(username,student_code,phone,name,email,password_hash,status,level,group_name,track_id) VALUES(?,?,?,?,?,?,?,?,?,?)');
       $stmt->execute([
         $username,$code!==''?$code:null,$phone!==''?$phone:null,$name,$email!==''?$email:null,$hash,
-        in_array(($body['status']??'active'),['active','disabled','pending'],true)?$body['status']:'active',
+        $studentStatus,
         trim((string)($body['level']??''))?:null,trim((string)($body['group_name']??''))?:null,$trackId
       ]);
       $studentId=(int)$pdo->lastInsertId();
@@ -597,8 +599,7 @@ if ($method === 'POST' && $path === '/platform/resources') {
             app_json(415, ['error' => 'فرمت مجاز فایل: TXT، MD یا PDF است.']);
         }
         $storage = '/var/lib/parse-admin/resources';
-        if (!is_dir($storage) && !mkdir($storage, 0750, true) && !is_dir($storage)) app_json(500, ['error' => 'پوشه منابع روی سرور ساخته نشد.']);
-        $safeName = bin2hex(random_bytes(16)) . '.' . $extension;
+        if (!is_dir($storage) && !mkdir($storage, 0750, true) && !is_dir($storage)) app_json(500, ['error' => 'پوشه منابع روی سرور ساخته نشد.']);        $safeName = bin2hex(random_bytes(16)) . '.' . $extension;
         $storedPath = $storage . '/' . $safeName;
         if (!move_uploaded_file((string)$file['tmp_name'], $storedPath)) app_json(500, ['error' => 'ذخیره فایل روی سرور انجام نشد.']);
         chmod($storedPath, 0640);
@@ -1197,8 +1198,7 @@ if ($method === 'POST' && $path === '/ai/chat/stream') {
     $headers=['Authorization: Bearer '.$apiKey,'Content-Type: application/json','Accept: text/event-stream','Idempotency-Key: '.bin2hex(random_bytes(18))];
     $responseHeaders=[];
     $raw='';
-    $curl=curl_init(PAASTA_AI_BASE.'/chat/completions');
-    curl_setopt_array($curl,[
+    $curl=curl_init(PAASTA_AI_BASE.'/chat/completions');    curl_setopt_array($curl,[
         CURLOPT_POST=>true,
         CURLOPT_POSTFIELDS=>json_encode($payload,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),
         CURLOPT_HTTPHEADER=>$headers,
