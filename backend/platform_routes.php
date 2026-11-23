@@ -166,7 +166,7 @@ if ($method === 'GET' && $path === '/activities') {
                 (SELECT COUNT(*) FROM activity_questions aq WHERE aq.activity_id=a.id) AS question_count
          FROM student_activity_assignments saa
          INNER JOIN learning_activities a ON a.id=saa.activity_id
-         WHERE saa.student_id=? AND a.status=\'published\' AND (a.track_id IS NULL OR a.track_id=?)
+         WHERE saa.student_id=? AND a.status=\'published\' AND (a.track_id IS NULL OR a.track_id=?) AND (a.level IS NULL OR a.level=\'\' OR a.level=?)
          ORDER BY a.due_at IS NULL,a.due_at,a.id DESC'
     );
     $stmt->execute([(int)$student['id'],(int)($student['track_id'] ?? 0),(string)($student['level'] ?? '')]);
@@ -180,9 +180,9 @@ if ($method === 'GET' && preg_match('#^/activities/([1-9][0-9]*)$#',$path,$m)) {
       'SELECT a.id,a.activity_type,a.title,a.description,a.subject,a.level,a.instructions,a.due_at,a.status,
               saa.status AS assignment_status
        FROM learning_activities a JOIN student_activity_assignments saa ON saa.activity_id=a.id
-       WHERE a.id=? AND saa.student_id=? AND a.status=\'published\' AND (a.track_id IS NULL OR a.track_id=?) LIMIT 1'
+       WHERE a.id=? AND saa.student_id=? AND a.status=\'published\' AND (a.track_id IS NULL OR a.track_id=?) AND (a.level IS NULL OR a.level=\'\' OR a.level=?) LIMIT 1'
     );
-    $head->execute([$id,(int)$student['id'],(int)($student['track_id'] ?? 0)]);$activity=$head->fetch();
+    $head->execute([$id,(int)$student['id'],(int)($student['track_id'] ?? 0),(string)($student['level'] ?? '')]);$activity=$head->fetch();
     if(!$activity)respond(404,['message'=>'این تمرین برای حساب شما در دسترس نیست.']);
     $questions=$pdo->prepare(
       'SELECT q.id,q.question_text,q.question_type,q.options_json,q.skill,q.difficulty,aq.position,q.points
@@ -205,7 +205,7 @@ if ($method === 'POST' && preg_match('#^/activities/([1-9][0-9]*)/submit$#',$pat
        JOIN student_activity_assignments saa ON saa.activity_id=a.id
        WHERE a.id=? AND saa.student_id=? AND a.status=\'published\' AND (a.track_id IS NULL OR a.track_id=?) LIMIT 1'
     );
-    $assignment->execute([$activityId,(int)$student['id'],(int)($student['track_id'] ?? 0)]);$activity=$assignment->fetch();
+    $assignment->execute([$activityId,(int)$student['id'],(int)($student['track_id'] ?? 0),(string)($student['level'] ?? '')]);$activity=$assignment->fetch();
     if(!$activity)respond(404,['message'=>'این تمرین برای حساب شما در دسترس نیست.']);
     if($activity['due_at'] && strtotime((string)$activity['due_at'])<time())respond(409,['message'=>'مهلت ارسال این تمرین به پایان رسیده است.']);
     $answers=$body['answers']??[];
