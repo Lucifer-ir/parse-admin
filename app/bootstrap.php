@@ -48,8 +48,8 @@ function app_e(mixed $value): string
 
 function app_https(): bool
 {
-    return (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-        || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+    // Nginx sets HTTPS=on explicitly in the TLS FastCGI location; do not trust client-supplied proxy headers.
+    return !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
 }
 
 function app_session_start(): void
