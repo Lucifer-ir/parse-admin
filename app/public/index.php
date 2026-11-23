@@ -161,6 +161,9 @@ $assetVersion = max(
       <button class="nav-item" data-page="exams"><i>◷</i><span>آزمون‌ها و زمان‌بندی</span></button>
       <button class="nav-item" data-page="attempts"><i>✓</i><span>پاسخ‌نامه‌ها و نمرات</span></button>
       <button class="nav-item" data-page="monitoring"><i>⌁</i><span>مانیتورینگ اپ</span></button>
+      <button class="nav-item" data-page="tracks"><i>⌘</i><span>زبان و مسیر آموزشی</span></button>
+      <button class="nav-item" data-page="activities"><i>▤</i><span>تمرین‌ها و تکالیف</span></button>
+      <button class="nav-item" data-page="activity-submissions"><i>✓</i><span>پاسخ تمرین‌ها</span></button>
       <button class="nav-item" data-page="prompts"><i>✎</i><span>قالب‌های دستور AI</span></button>
       <button class="nav-item" data-page="settings"><i>⚙</i><span>تنظیمات اتصال</span></button>
     </nav>
@@ -353,6 +356,47 @@ $assetVersion = max(
       <div class="page-heading"><div><div class="eyebrow">APPLICATION MONITORING</div><h1>مانیتورینگ اپلیکیشن</h1><p>آخرین حضور کاربران، ورودها، دانلود محتوا و فعالیت‌های آزمون در اپ Android / iOS / Web.</p></div><button class="button button-ghost" id="refreshMonitoring">↻ به‌روزرسانی</button></div>
       <div class="metric-grid"><article class="metric-card"><div class="metric-top"><span>آنلاین در ۵ دقیقه اخیر</span><i>●</i></div><strong id="onlineStudentCount">—</strong><small>بر اساس آخرین heartbeat / API activity</small></article><article class="metric-card"><div class="metric-top"><span>رویدادهای اخیر</span><i>⌁</i></div><strong id="monitorEventCount">—</strong><small>آخرین ۱۰۰ رویداد ثبت‌شده</small></article></div>
       <div class="dashboard-grid"><section class="panel-card table-panel"><h3>دانش‌آموزان آنلاین</h3><div class="table-scroll"><table><thead><tr><th>نام</th><th>نام کاربری</th><th>سطح / گروه</th><th>پلتفرم</th><th>آخرین فعالیت</th></tr></thead><tbody id="onlineStudentRows"></tbody></table></div></section><section class="panel-card table-panel"><h3>رویدادهای اخیر</h3><div class="table-scroll"><table><thead><tr><th>دانش‌آموز</th><th>رویداد</th><th>مسیر</th><th>پلتفرم</th><th>زمان</th></tr></thead><tbody id="monitorEventRows"></tbody></table></div></section></div>
+    </section>
+
+    <section class="page-view" id="page-tracks">
+      <div class="page-heading"><div><div class="eyebrow">LEARNING STRUCTURE</div><h1>زبان و مسیرهای آموزشی</h1><p>زبان، رشته، دوره و سطح را یک‌بار تعریف کن و دانش‌آموز، کتاب، تمرین و آزمون را به آن متصل کن.</p></div><button class="button button-ghost" id="refreshTracks">↻ به‌روزرسانی</button></div>
+      <div class="workspace-grid">
+        <form class="panel-card form-panel" id="trackCreateForm"><h3>تعریف مسیر آموزشی</h3>
+          <div class="form-two"><label>کد زبان (ISO)<input class="input" name="language_code" value="en" placeholder="en" dir="ltr" required></label><label>نام زبان<input class="input" name="language_name" placeholder="انگلیسی" required></label></div>
+          <label>رشته / مسیر<input class="input" name="track_title" placeholder="زبان عمومی" required></label>
+          <label>دوره آموزشی<input class="input" name="course_title" placeholder="دوره مکالمه بزرگسالان" required></label>
+          <label>سطح<input class="input" name="level_code" placeholder="A2" required></label>
+          <label>توضیحات<textarea class="input textarea" name="description" rows="2"></textarea></label>
+          <button class="button button-primary full-button" type="submit">ذخیره مسیر آموزشی</button><div class="form-message" id="trackCreateMessage"></div>
+        </form>
+        <section class="panel-card result-panel"><h3>نحوه تخصیص</h3><div class="security-row"><i>1</i><span><b>تعریف ساختار</b><small>هر مسیر شامل زبان، رشته، دوره و سطح مشخص است.</small></span></div><div class="security-row"><i>2</i><span><b>اتصال دانش‌آموز</b><small>حساب دانش‌آموز را به مسیر ثبت‌شده وصل کن.</small></span></div><div class="security-row"><i>3</i><span><b>محتوای متناسب</b><small>کتاب، تمرین و آزمون می‌توانند بر اساس مسیر و سطح فیلتر شوند.</small></span></div></section>
+      </div>
+      <section class="panel-card table-panel"><div class="table-scroll"><table><thead><tr><th>زبان</th><th>رشته</th><th>دوره</th><th>سطح</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody id="trackRows"><tr><td colspan="6" class="empty-cell">در حال دریافت...</td></tr></tbody></table></div></section>
+    </section>
+
+    <section class="page-view" id="page-activities">
+      <div class="page-heading"><div><div class="eyebrow">PRACTICE & ASSIGNMENTS</div><h1>تمرین‌ها و تکالیف</h1><p>از بانک سؤال یک تمرین بساز، مسیر یا سطح هدف و مهلت انجام را انتخاب کن.</p></div><button class="button button-ghost" id="refreshActivities">↻ به‌روزرسانی</button></div>
+      <div class="workspace-grid">
+        <form class="panel-card form-panel" id="activityCreateForm"><h3>ساخت تمرین جدید</h3>
+          <label>عنوان<input class="input" name="title" required></label>
+          <div class="form-two"><label>نوع<select class="input" name="activity_type"><option value="practice">تمرین</option><option value="assignment">تکلیف</option></select></label><label>وضعیت<select class="input" name="status"><option value="draft">پیش‌نویس</option><option value="published">انتشار</option></select></label></div>
+          <div class="form-two"><label>درس<input class="input" name="subject"></label><label>سطح<input class="input" name="level"></label></div>
+          <label>مسیر آموزشی<select class="input" name="track_id" id="activityTrack"><option value="">بدون محدودیت مسیر</option></select></label>
+          <label>دانش‌آموز مشخص (اختیاری)<select class="input" name="target_student_id" id="activityTargetStudent"><option value="">تخصیص بر اساس سطح / مسیر</option></select></label>
+          <label>مهلت انجام<input class="input" name="due_at" type="datetime-local"></label>
+          <label>شناسه سؤال‌های منتشرشده در بانک (با کاما جدا شود)<input class="input" name="question_ids" placeholder="12, 18, 24" required></label>
+          <label>دستورالعمل<textarea class="input textarea" name="instructions" rows="3"></textarea></label>
+          <button class="button button-primary full-button" type="submit">ساخت و تخصیص تمرین</button><div class="form-message" id="activityCreateMessage"></div>
+        </form>
+        <section class="panel-card result-panel"><h3>وضعیت تکالیف</h3><div class="security-row"><i>✓</i><span><b>قابل استفاده مجدد</b><small>سؤال‌ها از بانک سؤال لینک می‌شوند؛ سؤال تکراری لازم نیست دوباره ساخته شود.</small></span></div><div class="security-row"><i>◷</i><span><b>مهلت انجام</b><small>می‌توان برای هر تمرین تاریخ و ساعت پایان تعیین کرد.</small></span></div><div class="security-row"><i>✎</i><span><b>تصحیح</b><small>سؤال‌های عینی خودکار و پاسخ تشریحی با بررسی مدرس نمره‌دهی می‌شوند.</small></span></div></section>
+      </div>
+      <section class="panel-card table-panel"><div class="table-scroll"><table><thead><tr><th>عنوان</th><th>نوع</th><th>درس / سطح</th><th>سؤال</th><th>دانش‌آموز</th><th>ارسال</th><th>مهلت</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody id="activityRows"><tr><td colspan="9" class="empty-cell">در حال دریافت...</td></tr></tbody></table></div></section>
+    </section>
+
+    <section class="page-view" id="page-activity-submissions">
+      <div class="page-heading"><div><div class="eyebrow">PRACTICE REVIEW</div><h1>پاسخ تمرین‌ها و تکالیف</h1><p>مشاهده پاسخ‌ها، نمرات و بررسی موارد تشریحی.</p></div><button class="button button-ghost" id="refreshActivitySubmissions">↻ به‌روزرسانی</button></div>
+      <section class="panel-card table-panel"><div class="table-scroll"><table><thead><tr><th>دانش‌آموز</th><th>تمرین</th><th>تعداد پاسخ</th><th>زمان ارسال</th><th>نمره</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody id="activitySubmissionRows"><tr><td colspan="7" class="empty-cell">در حال دریافت...</td></tr></tbody></table></div></section>
+      <section class="panel-card" id="activitySubmissionDetailPanel" hidden><div class="panel-heading"><div><h3 id="activitySubmissionDetailTitle">جزئیات پاسخ تمرین</h3><p id="activitySubmissionDetailMeta"></p></div><button class="button button-secondary" id="closeActivitySubmissionDetail" type="button">بستن</button></div><div id="activitySubmissionAnswers"></div></section>
     </section>
 
     <section class="page-view" id="page-prompts">
