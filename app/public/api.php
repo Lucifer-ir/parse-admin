@@ -41,6 +41,9 @@ function ai_record_usage(array $admin, string $operation, string $endpoint, ?str
             'x-ratelimit-limit','x-ratelimit-remaining','x-ratelimit-reset'
         ])),
     ];
+    foreach (['pricing_components','billing','cost_breakdown','usage_breakdown','cached_savings_toman','cache_savings_toman','charged_toman','rate_per_minute'] as $metaField) {
+        if (array_key_exists($metaField, $data)) $providerMeta[$metaField] = $data[$metaField];
+    }
     $providerMetaJson = json_encode($providerMeta, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
     $stmt = app_db()->prepare(
