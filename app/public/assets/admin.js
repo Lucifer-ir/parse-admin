@@ -631,17 +631,32 @@
     }
   }
 
+  function localDateInput(date) {
+    const y=date.getFullYear();
+    const m=String(date.getMonth()+1).padStart(2,'0');
+    const d=String(date.getDate()).padStart(2,'0');
+    return y+'-'+m+'-'+d;
+  }
+
   async function loadUsage() {
     const now=new Date();const first=new Date(now.getFullYear(),now.getMonth(),1);
-    if(!$('#usageFrom').value) $('#usageFrom').value=first.toISOString().slice(0,10);
-    if(!$('#usageTo').value) $('#usageTo').value=now.toISOString().slice(0,10);
+    if(!$('#usageFrom').value) $('#usageFrom').value=localDateInput(first);
+    if(!$('#usageTo').value) $('#usageTo').value=localDateInput(now);
     const from=$('#usageFrom').value,to=$('#usageTo').value;
     try{
       const result=await api('/usage?from='+encodeURIComponent(from)+'&to='+encodeURIComponent(to));
       $('#usageRequests').textContent=number(result.summary.requests);
       $('#usageTokens').textContent=number(result.summary.tokens);
+      $('#usageCachedTokens').textContent=number(result.summary.cached_tokens);
       $('#usageCost').textContent=money(result.summary.cost);
-      $('#usageRows').innerHTML=result.rows.length?result.rows.map(row=>'<tr><td>'+escapeHtml(new Date(row.created_at).toLocaleString('fa-IR'))+'</td><td>'+escapeHtml(row.operation)+'</td><td dir="ltr">'+escapeHtml(row.model||'—')+'</td><td><span class="table-status '+(Number(row.status_code)<400?'ok':'bad')+'">'+number(row.status_code)+'</span></td><td>'+number(row.input_tokens)+'</td><td>'+number(row.output_tokens)+'</td><td>'+money(row.charged_toman)+'</td><td>'+number(row.latency_ms)+' ms</td></tr>').join(''):'<tr><td colspan="8" class="empty-cell">در این بازه گزارشی ثبت نشده است.</td></tr>';
+      $('#usageRows').innerHTML=result.rows.length?result.rows.map(row=>{
+        let meta='—';
+        try {
+          const decoded=JSON.parse(row.provider_meta_json||'{}');
+          if(decoded&&Object.keys(decoded).length) meta='<details class="usage-detail"><summary>جزئیات</summary><pre>'+escapeHtml(formatObject(decoded))+'</pre></details>';
+        } catch { meta='—'; }
+        return '<tr><td>'+escapeHtml(new Date(row.created_at).toLocaleString('fa-IR'))+'</td><td>'+escapeHtml(row.operation)+'</td><td dir="ltr">'+escapeHtml(row.model||'—')+'</td><td><span class="table-status '+(Number(row.status_code)<400?'ok':'bad')+'">'+number(row.status_code)+'</span></td><td>'+number(row.input_tokens)+'</td><td>'+number(row.output_tokens)+'</td><td>'+number(row.cached_input_tokens)+'</td><td>'+money(row.charged_toman)+'</td><td>'+number(row.latency_ms)+' ms</td><td>'+meta+'</td></tr>';
+      }).join(''):'<tr><td colspan="10" class="empty-cell">در این بازه گزارشی ثبت نشده است.</td></tr>';
     }catch(error){toast(error.message,'error');}
   }
 
