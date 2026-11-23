@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS learning_resources (
   level VARCHAR(80) NULL,
   content_text LONGTEXT NULL,
   file_url VARCHAR(1000) NULL,
+  storage_path VARCHAR(1000) NULL,
   original_filename VARCHAR(255) NULL,
   published TINYINT(1) NOT NULL DEFAULT 0,
   created_by BIGINT UNSIGNED NULL,
@@ -201,3 +202,14 @@ CREATE TABLE IF NOT EXISTS exam_answers (
   CONSTRAINT fk_exam_answer_attempt FOREIGN KEY (attempt_id) REFERENCES exam_attempts(id) ON DELETE CASCADE,
   CONSTRAINT fk_exam_answer_question FOREIGN KEY (question_id) REFERENCES question_bank(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+CREATE TABLE IF NOT EXISTS admin_ui_settings (
+  id TINYINT UNSIGNED NOT NULL,
+  api_base_url VARCHAR(500) NOT NULL DEFAULT 'https://api.aiparseh.ir/api',
+  custom_font_filename VARCHAR(255) NULL,
+  updated_by BIGINT UNSIGNED NULL,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+INSERT IGNORE INTO admin_ui_settings (id,api_base_url) VALUES (1,'https://api.aiparseh.ir/api');
