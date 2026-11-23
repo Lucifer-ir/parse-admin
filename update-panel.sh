@@ -34,10 +34,9 @@ git -C "$REPO_DIR" fetch --prune origin main
 git -C "$REPO_DIR" reset --hard origin/main
 
 for required in \
-  app/bootstrap.php app/public/index.php app/public/api.php \
-  app/public/assets/admin.css app/public/assets/admin.js \
-  backend/config.php backend/schema.sql backend/public/index.php \
-  backend/bin/backup-db.sh backend/migrations/20261123_ai_console.sql; do
+  app/bootstrap.php app/public/index.php app/public/api.php app/public/assets/admin.css app/public/assets/admin.js \
+  backend/config.php backend/schema.sql backend/public/index.php backend/platform_routes.php \
+  backend/bin/backup-db.sh backend/migrations/20261123_ai_console.sql backend/migrations/20261123_learning_platform.sql; do
   [[ -s "$REPO_DIR/$required" ]] || { echo "Required application file missing: $required" >&2; exit 1; }
 done
 
