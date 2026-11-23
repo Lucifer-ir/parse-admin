@@ -63,6 +63,93 @@ function parse_store_event(PDO $pdo, int $studentId, string $event, ?string $rou
     ]);
 }
 
+function parse_save_student_audio(PDO $pdo, array $student, string $contextType, int $contextId, int $questionId): never
+{
+    $upload=$_FILES['audio']??null;
+    if(!is_array($upload)||($upload['error']??UPLOAD_ERR_NO_FILE)!==UPLOAD_ERR_OK)respond(422,['message'=>'فایل صوتی انتخاب یا بارگذاری نشد.']);
+    $size=(int)($upload['size']??0);
+    if($size<1||$size>15*1024*1024)respond(413,['message'=>'حجم فایل صوتی باید حداکثر ۱۵ مگابایت باشد.']);
+    if(!is_uploaded_file((string)($upload['tmp_name']??'')))respond(400,['message'=>'فایل بارگذاری‌شده معتبر نیست.']);
+    $extension=strtolower(pathinfo((string)($upload['name']??''),PATHINFO_EXTENSION));
+    $allowedExtensions=['mp3','m4a','wav','ogg','oga','webm','aac','mp4','3gp'];
+    if(!in_array($extension,$allowedExtensions,true))respond(415,['message'=>'فرمت مجاز صوت: MP3، M4A، WAV، OGG، WEBM یا AAC است.']);
+    $finfo=new finfo(FILEINFO_MIME_TYPE);
+    $mime=(string)$finfo->file((string)$upload['tmp_name']);
+    $allowedMimes=['audio/mpeg','audio/mp4','audio/x-m4a','audio/aac','audio/wav','audio/x-wav','audio/ogg','application/ogg','audio/webm','video/webm','video/mp4','audio/3gpp','application/octet-stream'];
+    if(!in_array($mime,$allowedMimes,true))respond(415,['message'=>'محتوای فایل، صوتی معتبر نیست.']);
+
+    if($contextType==='activity'){
+        $check=$pdo->prepare(
+          "SELECT q.id FROM activity_questions aq
+           JOIN question_bank q ON q.id=aq.question_id
+           JOIN learning_activities a ON a.id=aq.activity_id
+           JOIN student_activity_assignments saa ON saa.activity_id=a.id
+           WHERE aq.activity_id=? AND q.id=? AND q.question_type='speaking'
+             AND saa.student_id=? AND a.status='published' LIMIT 1"
+        );
+        $check->execute([$contextId,$questionId,(int)$student['id']]);
+        if(!$check->fetchColumn())respond(404,['message'=>'سؤال گفتاری در این تمرین یا تکلیف پیدا نشد.']);
+        $pdo->prepare(
+          "INSERT INTO activity_submissions(activity_id,student_id,status) VALUES(?,?,'in_progress')
+           ON DUPLICATE KEY UPDATE status='in_progress'"
+        )->execute([$contextId,(int)$student['id']]);
+        $find=$pdo->prepare('SELECT id FROM activity_submissions WHERE activity_id=? AND student_id=?');
+        $find->execute([$contextId,(int)$student['id']]);$answerContextId=(int)$find->fetchColumn();
+    }else{
+        $check=$pdo->prepare(
+          "SELECT eq.question_id FROM exam_questions eq
+           JOIN question_bank q ON q.id=eq.question_id
+           JOIN exam_attempts ea ON ea.exam_id=eq.exam_id
+           WHERE eq.exam_id=? AND q.id=? AND q.question_type='speaking'
+             AND ea.student_id=? AND ea.status='in_progress' AND ea.expires_at>UTC_TIMESTAMP()
+           ORDER BY ea.id DESC LIMIT 1"
+        );
+        $check->execute([$contextId,$questionId,(int)$student['id']]);
+        if(!$check->fetchColumn())respond(409,['message'=>'برای این آزمون، سؤال گفتاری یا زمان پاسخ‌گویی فعال نیست.']);
+        $find=$pdo->prepare("SELECT id FROM exam_attempts WHERE exam_id=? AND student_id=? AND status='in_progress' AND expires_at>UTC_TIMESTAMP() ORDER BY id DESC LIMIT 1");
+        $find->execute([$contextId,(int)$student['id']]);$answerContextId=(int)$find->fetchColumn();
+    }
+    if($answerContextId<1)respond(409,['message'=>'جلسه پاسخ‌گویی فعال پیدا نشد.']);
+
+    $storage='/var/lib/parse-admin/student-audio';
+    if(!is_dir($storage)&&!mkdir($storage,0750,true)&&!is_dir($storage))respond(500,['message'=>'فضای ذخیره فایل صوتی روی سرور آماده نیست.']);
+    $safeName=bin2hex(random_bytes(20)).'.'.$extension;
+    $storedPath=$storage.'/'.$safeName;
+    if(!move_uploaded_file((string)$upload['tmp_name'],$storedPath))respond(500,['message'=>'ذخیره فایل صوتی روی سرور انجام نشد.']);
+    chmod($storedPath,0640);
+    $old=$pdo->prepare('SELECT file_path FROM student_audio_responses WHERE student_id=? AND context_type=? AND context_id=? AND question_id=?');
+    $old->execute([(int)$student['id'],$contextType,$contextId,$questionId]);$oldPath=$old->fetchColumn();
+    try{
+      $stmt=$pdo->prepare(
+        'INSERT INTO student_audio_responses(student_id,context_type,context_id,question_id,file_path,mime_type,original_filename,file_size)
+         VALUES(?,?,?,?,?,?,?,?)
+         ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id),file_path=VALUES(file_path),mime_type=VALUES(mime_type),original_filename=VALUES(original_filename),file_size=VALUES(file_size),created_at=CURRENT_TIMESTAMP'
+      );
+      $stmt->execute([(int)$student['id'],$contextType,$contextId,$questionId,$storedPath,$mime,basename((string)$upload['name']),$size]);
+      $audioId=(int)$pdo->lastInsertId();
+      $payload=json_encode(['audio_response_id'=>$audioId,'file_name'=>basename((string)$upload['name'])],JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
+      if($contextType==='activity'){
+        $pdo->prepare(
+          'INSERT INTO activity_answers(submission_id,question_id,answer_json,is_correct,awarded_points)
+           VALUES(?,?,?,NULL,NULL)
+           ON DUPLICATE KEY UPDATE answer_json=VALUES(answer_json),is_correct=NULL,awarded_points=NULL,answered_at=UTC_TIMESTAMP()'
+        )->execute([$answerContextId,$questionId,$payload]);
+        $pdo->prepare("UPDATE student_activity_assignments SET status='in_progress' WHERE activity_id=? AND student_id=?")->execute([$contextId,(int)$student['id']]);
+      }else{
+        $pdo->prepare(
+          'INSERT INTO exam_answers(attempt_id,question_id,answer_json,is_correct,awarded_points)
+           VALUES(?,?,?,NULL,NULL)
+           ON DUPLICATE KEY UPDATE answer_json=VALUES(answer_json),is_correct=NULL,awarded_points=NULL,answered_at=UTC_TIMESTAMP()'
+        )->execute([$answerContextId,$questionId,$payload]);
+      }
+      if(is_string($oldPath)&&$oldPath!==''&&str_starts_with($oldPath,$storage.'/')&&is_file($oldPath))@unlink($oldPath);
+    }catch(Throwable $e){
+      if(is_file($storedPath))@unlink($storedPath);
+      throw $e;
+    }
+    respond(201,['uploaded'=>true,'audio_response_id'=>$audioId,'file_name'=>basename((string)$upload['name'])]);
+}
+
 /* Student login uses username/phone. Admin login (email) remains backward compatible. */
 if ($method === 'POST' && $path === '/auth/register') {
     $body = request_body();
@@ -185,7 +272,7 @@ if ($method === 'GET' && preg_match('#^/activities/([1-9][0-9]*)$#',$path,$m)) {
     $head->execute([$id,(int)$student['id'],(int)($student['track_id'] ?? 0),(string)($student['level'] ?? '')]);$activity=$head->fetch();
     if(!$activity)respond(404,['message'=>'این تمرین برای حساب شما در دسترس نیست.']);
     $questions=$pdo->prepare(
-      'SELECT q.id,q.question_text,q.question_type,q.options_json,q.skill,q.difficulty,aq.position,q.points
+      'SELECT q.id,q.question_text,q.question_type,q.options_json,q.audio_url,q.skill,q.difficulty,aq.position,q.points
        FROM activity_questions aq JOIN question_bank q ON q.id=aq.question_id
        WHERE aq.activity_id=? AND q.status=\'published\' ORDER BY aq.position'
     );
@@ -196,6 +283,28 @@ if ($method === 'GET' && preg_match('#^/activities/([1-9][0-9]*)$#',$path,$m)) {
     }
     unset($question);
     respond(200,['activity'=>$activity]);
+}
+
+if ($method === 'POST' && preg_match('#^/activities/([1-9][0-9]*)/audio/([1-9][0-9]*)$#',$path,$m)) {
+    $student=parse_require_student($pdo);
+    parse_save_student_audio($pdo,$student,'activity',(int)$m[1],(int)$m[2]);
+}
+
+if ($method === 'POST' && preg_match('#^/exams/([1-9][0-9]*)/audio/([1-9][0-9]*)$#',$path,$m)) {
+    $student=parse_require_student($pdo);
+    parse_save_student_audio($pdo,$student,'exam',(int)$m[1],(int)$m[2]);
+}
+
+if ($method === 'GET' && preg_match('#^/student-audio/([1-9][0-9]*)$#',$path,$m)) {
+    $student=parse_require_student($pdo);
+    $stmt=$pdo->prepare('SELECT file_path,mime_type,original_filename FROM student_audio_responses WHERE id=? AND student_id=? LIMIT 1');
+    $stmt->execute([(int)$m[1],(int)$student['id']]);$audio=$stmt->fetch();
+    if(!$audio||!is_file((string)$audio['file_path']))respond(404,['message'=>'فایل صوتی در دسترس نیست.']);
+    header('Content-Type: '.(string)$audio['mime_type']);
+    header('Content-Length: '.(string)filesize((string)$audio['file_path']));
+    header('Content-Disposition: inline; filename="'.rawurlencode((string)$audio['original_filename']).'"');
+    header('X-Content-Type-Options: nosniff');
+    readfile((string)$audio['file_path']);exit;
 }
 
 if ($method === 'POST' && preg_match('#^/activities/([1-9][0-9]*)/submit$#',$path,$m)) {
@@ -251,6 +360,8 @@ if ($method === 'POST' && preg_match('#^/activities/([1-9][0-9]*)/submit$#',$pat
       $pdo->commit();
     }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
     parse_store_event($pdo,(int)$student['id'],'activity.submit','/activities/'.$activityId,['submission_id'=>$submissionId]);
+    $pendingStmt=$pdo->prepare('SELECT COUNT(*) FROM activity_answers WHERE submission_id=? AND is_correct IS NULL AND awarded_points IS NULL');
+    $pendingStmt->execute([$submissionId]);$manual=(int)$pendingStmt->fetchColumn();
     respond(200,['submitted'=>true,'score'=>$score,'total_points'=>$total,'pending_manual_review'=>$manual]);
 }
 
@@ -281,7 +392,7 @@ if ($method === 'GET' && preg_match('#^/exams/([1-9][0-9]*)$#', $path, $m)) {
     $exam = $stmt->fetch();
     if (!$exam) respond(404, ['message' => 'آزمون پیدا نشد یا در دسترس نیست.']);
     $q = $pdo->prepare(
-        'SELECT q.id,q.question_text,q.question_type,q.options_json,q.difficulty,q.skill,eq.points,eq.position
+        'SELECT q.id,q.question_text,q.question_type,q.options_json,q.audio_url,q.difficulty,q.skill,eq.points,eq.position
          FROM exam_questions eq INNER JOIN question_bank q ON q.id=eq.question_id
          WHERE eq.exam_id=? AND q.status=\'published\' ORDER BY eq.position,q.id'
     );
