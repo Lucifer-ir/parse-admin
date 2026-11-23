@@ -11,7 +11,7 @@ function parse_student_from_token(PDO $pdo): ?array
     $header = (string)($_SERVER['HTTP_AUTHORIZATION'] ?? '');
     if (!preg_match('/^Bearer ([a-f0-9]{64})$/i', $header, $m)) return null;
     $stmt = $pdo->prepare(
-        'SELECT s.id,s.username,s.student_code,s.phone,s.name,s.email,s.status,s.level,s.group_name,
+        'SELECT s.id,s.username,s.student_code,s.phone,s.name,s.email,s.status,s.level,s.group_name,s.track_id,
                 t.id AS token_id
          FROM student_auth_tokens t
          INNER JOIN students s ON s.id=t.student_id
@@ -22,7 +22,7 @@ function parse_student_from_token(PDO $pdo): ?array
     $student = $stmt->fetch();
     if (!$student) return null;
     $pdo->prepare('UPDATE student_auth_tokens SET last_used_at=UTC_TIMESTAMP() WHERE id=?')->execute([(int)$student['token_id']]);
-    $pdo->prepare('UPDATE students SET last_seen_at=UTC_TIMESTAMP() WHERE id=?')->execute([(int)$student['id']]);
+    $pdo->prepare('UPDATE students SET last_seen_at=UTC_TIMESTAMP(),last_seen_platform=? WHERE id=?')->execute([(int)$student['id']]);
     unset($student['token_id']);
     return $student;
 }
@@ -106,7 +106,7 @@ if ($method === 'POST' && $path === '/auth/login') {
         }
         unset($student['password_hash']);
         $token = parse_issue_student_token($pdo, (int)$student['id']);
-        $pdo->prepare('UPDATE students SET last_seen_at=UTC_TIMESTAMP() WHERE id=?')->execute([(int)$student['id']]);
+        $pdo->prepare('UPDATE students SET last_seen_at=UTC_TIMESTAMP(),last_seen_platform=? WHERE id=?')->execute([substr((string)($body['platform'] ?? 'unknown'),0,40),(int)$student['id']]);
         parse_store_event($pdo, (int)$student['id'], 'login', '/auth/login', ['platform' => $body['platform'] ?? 'unknown']);
         respond(200, ['token' => $token, 'user' => $student]);
     }
@@ -145,12 +145,12 @@ if ($method === 'POST' && $path === '/activity') {
 if ($method === 'GET' && $path === '/resources') {
     $student = parse_require_student($pdo);
     $stmt = $pdo->prepare(
-        'SELECT r.id,r.resource_type,r.title,r.description,r.subject,r.level,r.file_url,r.original_filename,r.updated_at
+        'SELECT r.id,r.resource_type,r.title,r.description,r.subject,r.level,r.track_id,r.file_url,r.original_filename,r.updated_at
          FROM learning_resources r
-         WHERE r.published=1 AND (r.level IS NULL OR r.level=\'\' OR r.level=?)
+         WHERE r.published=1 AND (r.level IS NULL OR r.level=\'\' OR r.level=?) AND (r.track_id IS NULL OR r.track_id=?)
          ORDER BY r.resource_type,r.title'
     );
-    $stmt->execute([(string)($student['level'] ?? '')]);
+    $stmt->execute([(string)($student['level'] ?? ''),(int)($student['track_id'] ?? 0)]);
     respond(200, ['rows' => $stmt->fetchAll()]);
 }
 
@@ -158,15 +158,15 @@ if ($method === 'GET' && $path === '/resources') {
 if ($method === 'GET' && $path === '/activities') {
     $student = parse_require_student($pdo);
     $stmt = $pdo->prepare(
-        'SELECT a.id,a.activity_type,a.title,a.description,a.subject,a.level,a.due_at,a.status,
+        'SELECT a.id,a.activity_type,a.title,a.description,a.subject,a.level,a.track_id,a.due_at,a.status,
                 saa.status AS assignment_status,saa.score,saa.completed_at,
                 (SELECT COUNT(*) FROM activity_questions aq WHERE aq.activity_id=a.id) AS question_count
          FROM student_activity_assignments saa
          INNER JOIN learning_activities a ON a.id=saa.activity_id
-         WHERE saa.student_id=? AND a.status=\\'published\\'
+         WHERE saa.student_id=? AND a.status=\'published\' AND (a.track_id IS NULL OR a.track_id=?)
          ORDER BY a.due_at IS NULL,a.due_at,a.id DESC'
     );
-    $stmt->execute([(int)$student['id']]);
+    $stmt->execute([(int)$student['id'],(int)($student['track_id'] ?? 0)]);
     respond(200,['rows'=>$stmt->fetchAll()]);
 }
 
@@ -177,14 +177,14 @@ if ($method === 'GET' && preg_match('#^/activities/([1-9][0-9]*)$#',$path,$m)) {
       'SELECT a.id,a.activity_type,a.title,a.description,a.subject,a.level,a.instructions,a.due_at,a.status,
               saa.status AS assignment_status
        FROM learning_activities a JOIN student_activity_assignments saa ON saa.activity_id=a.id
-       WHERE a.id=? AND saa.student_id=? AND a.status=\\'published\\' LIMIT 1'
+       WHERE a.id=? AND saa.student_id=? AND a.status=\'published\' AND (a.track_id IS NULL OR a.track_id=?) LIMIT 1'
     );
-    $head->execute([$id,(int)$student['id']]);$activity=$head->fetch();
+    $head->execute([$id,(int)$student['id'],(int)($student['track_id'] ?? 0)]);$activity=$head->fetch();
     if(!$activity)respond(404,['message'=>'این تمرین برای حساب شما در دسترس نیست.']);
     $questions=$pdo->prepare(
       'SELECT q.id,q.question_text,q.question_type,q.options_json,q.skill,q.difficulty,aq.position,q.points
        FROM activity_questions aq JOIN question_bank q ON q.id=aq.question_id
-       WHERE aq.activity_id=? AND q.status=\\'published\\' ORDER BY aq.position'
+       WHERE aq.activity_id=? AND q.status=\'published\' ORDER BY aq.position'
     );
     $questions->execute([$id]);$activity['questions']=$questions->fetchAll();
     foreach($activity['questions'] as &$question){
@@ -200,9 +200,9 @@ if ($method === 'POST' && preg_match('#^/activities/([1-9][0-9]*)/submit$#',$pat
     $assignment=$pdo->prepare(
       'SELECT a.id,a.due_at FROM learning_activities a
        JOIN student_activity_assignments saa ON saa.activity_id=a.id
-       WHERE a.id=? AND saa.student_id=? AND a.status=\\'published\\' LIMIT 1'
+       WHERE a.id=? AND saa.student_id=? AND a.status=\'published\' AND (a.track_id IS NULL OR a.track_id=?) LIMIT 1'
     );
-    $assignment->execute([$activityId,(int)$student['id']]);$activity=$assignment->fetch();
+    $assignment->execute([$activityId,(int)$student['id'],(int)($student['track_id'] ?? 0)]);$activity=$assignment->fetch();
     if(!$activity)respond(404,['message'=>'این تمرین برای حساب شما در دسترس نیست.']);
     if($activity['due_at'] && strtotime((string)$activity['due_at'])<time())respond(409,['message'=>'مهلت ارسال این تمرین به پایان رسیده است.']);
     $answers=$body['answers']??[];
@@ -211,11 +211,11 @@ if ($method === 'POST' && preg_match('#^/activities/([1-9][0-9]*)/submit$#',$pat
     try{
       $pdo->prepare(
         'INSERT INTO activity_submissions(activity_id,student_id,status)
-         VALUES(?,?,\\'in_progress\\') ON DUPLICATE KEY UPDATE status=\\'in_progress\\''
+         VALUES(?,?,\'in_progress\') ON DUPLICATE KEY UPDATE status=\'in_progress\''
       )->execute([$activityId,(int)$student['id']]);
       $find=$pdo->prepare('SELECT id FROM activity_submissions WHERE activity_id=? AND student_id=?');
       $find->execute([$activityId,(int)$student['id']]);$submissionId=(int)$find->fetchColumn();
-      $allowed=$pdo->prepare('SELECT q.id,q.question_type,q.answer_json,aq.points FROM activity_questions aq JOIN question_bank q ON q.id=aq.question_id WHERE aq.activity_id=? AND q.id=? AND q.status=\\'published\\'');
+      $allowed=$pdo->prepare('SELECT q.id,q.question_type,q.answer_json,aq.points FROM activity_questions aq JOIN question_bank q ON q.id=aq.question_id WHERE aq.activity_id=? AND q.id=? AND q.status=\'published\'');
       $save=$pdo->prepare(
         'INSERT INTO activity_answers(submission_id,question_id,answer_json,is_correct,awarded_points)
          VALUES(?,?,?,?,?) ON DUPLICATE KEY UPDATE answer_json=VALUES(answer_json),is_correct=VALUES(is_correct),awarded_points=VALUES(awarded_points),answered_at=UTC_TIMESTAMP()'
@@ -234,13 +234,13 @@ if ($method === 'POST' && preg_match('#^/activities/([1-9][0-9]*)/submit$#',$pat
           $norm=static fn($v)=>mb_strtolower(trim(is_scalar($v)?(string)$v:json_encode($v,JSON_UNESCAPED_UNICODE)));
           $isCorrect=$norm($given)===$norm($correct);$awarded=$isCorrect?$points:0.0;$score+=$awarded;
         }else{$isCorrect=null;$awarded=null;$manual++;}
-        $save->execute([$submissionId,$questionId,parse_json($given),$isCorrect===null?null:($isCorrect?1:0),$awarded]);
+        $save->execute([$submissionId,$questionId,json_encode($given, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),$isCorrect===null?null:($isCorrect?1:0),$awarded]);
       }
       $pdo->prepare(
-        'UPDATE activity_submissions SET submitted_at=UTC_TIMESTAMP(),score=?,total_points=?,status=\\'submitted\\' WHERE id=?'
+        'UPDATE activity_submissions SET submitted_at=UTC_TIMESTAMP(),score=?,total_points=?,status=\'submitted\' WHERE id=?'
       )->execute([$score,$total,$submissionId]);
       $pdo->prepare(
-        'UPDATE student_activity_assignments SET completed_at=UTC_TIMESTAMP(),score=?,status=\\'submitted\\' WHERE activity_id=? AND student_id=?'
+        'UPDATE student_activity_assignments SET completed_at=UTC_TIMESTAMP(),score=?,status=\'submitted\' WHERE activity_id=? AND student_id=?'
       )->execute([$score,$activityId,(int)$student['id']]);
       $pdo->commit();
     }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
@@ -254,12 +254,12 @@ if ($method === 'GET' && $path === '/exams') {
         'SELECT e.id,e.title,e.description,e.subject,e.level,e.duration_minutes,e.starts_at,e.ends_at,e.show_result,
                 COUNT(eq.question_id) AS question_count
          FROM exams e LEFT JOIN exam_questions eq ON eq.exam_id=e.id
-         WHERE e.status=\'published\' AND (e.target_student_id IS NULL OR e.target_student_id=?)
+         WHERE e.status=\'published\' AND (e.target_student_id IS NULL OR e.target_student_id=?) AND (e.track_id IS NULL OR e.track_id=?)
            AND (e.starts_at IS NULL OR e.starts_at<=UTC_TIMESTAMP())
            AND (e.ends_at IS NULL OR e.ends_at>=UTC_TIMESTAMP())
          GROUP BY e.id ORDER BY e.starts_at,e.id DESC'
     );
-    $stmt->execute([(int)$student['id']]);
+    $stmt->execute([(int)$student['id'],(int)($student['track_id'] ?? 0)]);
     respond(200, ['rows' => $stmt->fetchAll()]);
 }
 
@@ -267,10 +267,10 @@ if ($method === 'GET' && preg_match('#^/exams/([1-9][0-9]*)$#', $path, $m)) {
     $student = parse_require_student($pdo);
     $examId = (int)$m[1];
     $stmt = $pdo->prepare(
-        'SELECT id,title,description,subject,level,duration_minutes,starts_at,ends_at,show_result,status
-         FROM exams WHERE id=? AND status=\'published\' AND (target_student_id IS NULL OR target_student_id=?) LIMIT 1'
+        'SELECT id,title,description,subject,level,track_id,duration_minutes,starts_at,ends_at,show_result,status
+         FROM exams WHERE id=? AND status=\'published\' AND (target_student_id IS NULL OR target_student_id=?) AND (track_id IS NULL OR track_id=?) LIMIT 1'
     );
-    $stmt->execute([$examId, (int)$student['id']]);
+    $stmt->execute([$examId, (int)$student['id'],(int)($student['track_id'] ?? 0)]);
     $exam = $stmt->fetch();
     if (!$exam) respond(404, ['message' => 'آزمون پیدا نشد یا در دسترس نیست.']);
     $q = $pdo->prepare(
@@ -293,11 +293,11 @@ if ($method === 'POST' && preg_match('#^/exams/([1-9][0-9]*)/start$#', $path, $m
     $examId = (int)$m[1];
     $check = $pdo->prepare(
         'SELECT id,duration_minutes FROM exams WHERE id=? AND status=\'published\'
-         AND (target_student_id IS NULL OR target_student_id=?)
+         AND (target_student_id IS NULL OR target_student_id=?) AND (track_id IS NULL OR track_id=?)
          AND (starts_at IS NULL OR starts_at<=UTC_TIMESTAMP())
          AND (ends_at IS NULL OR ends_at>=UTC_TIMESTAMP()) LIMIT 1'
     );
-    $check->execute([$examId, (int)$student['id']]);
+    $check->execute([$examId, (int)$student['id'],(int)($student['track_id'] ?? 0)]);
     $exam = $check->fetch();
     if (!$exam) respond(404, ['message' => 'آزمون در حال حاضر در دسترس نیست.']);
     $existing = $pdo->prepare(
