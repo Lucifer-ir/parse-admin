@@ -27,7 +27,7 @@ export DEBIAN_FRONTEND=noninteractive
 
 echo "[1/8] Installing Nginx, MySQL, PHP-FPM and required extensions..."
 apt-get update
-apt-get install -y ca-certificates curl git nginx rsync mysql-server openssl certbot python3-certbot-nginx php-fpm php-cli php-mysql php-curl php-mbstring
+apt-get install -y ca-certificates curl git nginx rsync mysql-server openssl certbot cron python3-certbot-nginx php-fpm php-cli php-mysql php-curl php-mbstring
 
 PHP_VERSION="$(php -r 'echo PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION;')"
 PHP_FPM_SERVICE="php${PHP_VERSION}-fpm"
@@ -106,10 +106,27 @@ ENV
 chown root:www-data /etc/parse-api.env
 chmod 0640 /etc/parse-api.env
 
-echo "[6/8] Creating first administrator if one does not already exist..."
+echo "[6/9] Configuring encrypted-at-rest-permissions local database backups..."
+cat > /etc/parse-db-backup.cnf <<MYSQL_CNF
+[client]
+host=localhost
+user=$DB_USER
+password=$DB_PASS
+MYSQL_CNF
+chmod 0600 /etc/parse-db-backup.cnf
+install -o root -g root -m 0700 "$INSTALL_DIR/backend/bin/backup-db.sh" /usr/local/sbin/parse-admin-db-backup
+install -d -o root -g root -m 0700 /var/backups/parse-admin
+cat > /etc/cron.d/parse-admin-db-backup <<'CRON'
+17 2 * * * root /usr/local/sbin/parse-admin-db-backup
+CRON
+chmod 0644 /etc/cron.d/parse-admin-db-backup
+systemctl enable --now cron
+
+
+echo "[7/9] Creating first administrator if one does not already exist..."
 php "$INSTALL_DIR/backend/bin/create-admin.php"
 
-echo "[7/8] Configuring PHP-FPM and Nginx API virtual host..."
+echo "[8/9] Configuring PHP-FPM and Nginx API virtual host..."
 cat > "/etc/php/$PHP_VERSION/fpm/conf.d/99-parse-api-security.ini" <<'PHPINI'
 expose_php=Off
 display_errors=Off
@@ -165,7 +182,7 @@ ln -sfn /etc/nginx/sites-available/parse-api /etc/nginx/sites-enabled/parse-api
 nginx -t
 systemctl reload nginx
 
-echo "[8/8] Configuring HTTPS for API..."
+echo "[9/9] Configuring HTTPS for API..."
 if getent ahostsv4 "$API_DOMAIN" >/dev/null 2>&1; then
   CERTBOT_ARGS=(--nginx -d "$API_DOMAIN" --non-interactive --agree-tos --redirect)
   if [[ -n "$LE_EMAIL" ]]; then
