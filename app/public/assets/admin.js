@@ -452,6 +452,77 @@
       }
     });
 
+    $('#runResponsesStream').addEventListener('click',async()=>{
+      let data;
+      try { data=parseAdvancedOptions(payloadFromForm($('#chatForm'))); }
+      catch { return setMessage('#chatMessage','ساختار JSON در تنظیمات پیشرفته معتبر نیست.','error'); }
+      if(!data.model||(!data.message&&!data.responses_input)) return toast('مدل و ورودی را وارد کنید.','error');
+      const payload={
+        model:data.model,
+        input:data.responses_input||data.message,
+        instructions:data.system,
+        max_output_tokens:Number(data.max_tokens||1024),
+        save_history:data.save_history,
+        tools:data.tools,
+        tool_choice:data.tool_choice,
+        response_format:data.response_format,
+        pdf_processing:data.pdf_processing,
+        structured_outputs:data.structured_outputs,
+        max_tool_calls:data.max_tool_calls
+      };
+      if(payload.tools===undefined) delete payload.tools;
+      if(payload.tool_choice===undefined) delete payload.tool_choice;
+      if(payload.response_format===undefined) delete payload.response_format;
+      if(payload.pdf_processing===undefined) delete payload.pdf_processing;
+      if(payload.structured_outputs===undefined) delete payload.structured_outputs;
+      if(payload.max_tool_calls===undefined) delete payload.max_tool_calls;
+      $('#chatState').textContent='Responses Stream';
+      $('#chatOutput').textContent='';
+      setMessage('#chatMessage','در حال دریافت خروجی جریانی Responses...');
+      try {
+        const response=await fetch('/api/ai/responses/stream',{
+          method:'POST',
+          credentials:'same-origin',
+          headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},
+          body:json(payload)
+        });
+        if(!response.ok||!response.body) {
+          const err=await response.json().catch(()=>({}));
+          throw new Error(err.error||'خطای HTTP '+response.status);
+        }
+        const reader=response.body.getReader();
+        const decoder=new TextDecoder();
+        let buffer='',eventName='',finalError='';
+        while(true) {
+          const {value,done}=await reader.read();
+          if(done)break;
+          buffer+=decoder.decode(value,{stream:true});
+          const lines=buffer.split(/\r?\n/);
+          buffer=lines.pop()||'';
+          for(const line of lines) {
+            if(line.startsWith('event:')) { eventName=line.slice(6).trim(); continue; }
+            if(!line.startsWith('data:')) continue;
+            const raw=line.slice(5).trim();
+            if(!raw||raw==='[DONE]')continue;
+            try {
+              const event=JSON.parse(raw);
+              if(event.error||eventName==='error') { finalError=event.error||'خطای جریانی Provider'; continue; }
+              const type=String(event.type||eventName||'');
+              const delta=event.delta??event.output_text_delta??null;
+              if(typeof delta==='string'&&type.includes('output_text')) $('#chatOutput').textContent+=delta;
+            } catch { /* Ignore incomplete SSE JSON frames. */ }
+            eventName='';
+          }
+        }
+        if(finalError)throw new Error(finalError);
+        $('#chatState').textContent='تکمیل شد';
+        setMessage('#chatMessage','جریان Responses پایان یافت؛ مصرف و هزینه ثبت شد.','success');
+      } catch(error) {
+        $('#chatState').textContent='خطا';
+        setMessage('#chatMessage',error.message,'error');
+      }
+    });
+
     $('#imageForm').addEventListener('submit',async event=>{
       event.preventDefault();const form=$('#imageForm');const data=payloadFromForm(form);setBusy(form,true,'در حال ساخت تصویر...');
       setMessage('#imageMessage','تصویر در حال تولید است؛ ممکن است زمان‌بر باشد.');
