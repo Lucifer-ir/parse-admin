@@ -545,7 +545,7 @@
       setBusy(form,true,'در حال ویرایش...');
       try {
         if(urls.length<1||urls.length>4) throw new Error('بین ۱ تا ۴ نشانی عمومی HTTPS وارد کنید.');
-        if(urls.some(url=>!/^https:\\/\\//i.test(url))) throw new Error('فقط نشانی عمومی HTTPS پذیرفته می‌شود.');
+        if(urls.some(url=>!url.toLowerCase().startsWith('https://'))) throw new Error('فقط نشانی عمومی HTTPS پذیرفته می‌شود.');
         const payload={model:data.model,prompt:data.prompt};
         if(urls.length===1) payload.image_url=urls[0];
         else payload.image_urls=urls;
