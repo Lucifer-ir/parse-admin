@@ -397,6 +397,16 @@ $assetVersion = max(
         </form>
         <div class="table-scroll"><table><thead><tr><th>نوع کلاس</th><th>شناسه</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody id="classTypeRows"></tbody></table></div>
       </section>
+      <section class="panel-card" style="margin-top:16px">
+        <h3>مدیریت سطح‌های آموزشی</h3>
+        <p class="muted-label">سطح‌ها را یک‌بار برای هر زبان تعریف کن؛ سپس هنگام ساخت مسیر و تغییر سطح دانش‌آموز از فهرست آماده انتخاب می‌شوند.</p>
+        <form id="levelCreateForm" class="form-panel">
+          <div class="form-two"><label>زبان<select class="input" name="language_code" id="levelLanguage" required></select></label><label>کد سطح<input class="input" name="level_code" placeholder="A3" dir="ltr" required></label></div>
+          <div class="form-two"><label>عنوان سطح<input class="input" name="level_name" placeholder="Upper Elementary" required></label><label>ترتیب نمایش<input class="input" name="level_order" type="number" min="1" max="999" value="100" required></label></div>
+          <button class="button button-primary" type="submit">افزودن سطح</button><div id="levelMessage" class="form-message"></div>
+        </form>
+        <div class="table-scroll"><table><thead><tr><th>زبان</th><th>کد سطح</th><th>عنوان</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody id="levelRows"></tbody></table></div>
+      </section>
       <section class="panel-card table-panel"><div class="table-scroll"><table><thead><tr><th>زبان</th><th>رشته</th><th>دوره</th><th>سطح</th><th>نوع کلاس</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody id="trackRows"><tr><td colspan="7" class="empty-cell">در حال دریافت...</td></tr></tbody></table></div></section>
     </section>
 
