@@ -759,6 +759,22 @@
     } catch (error) { $('#batchResult').textContent = error.message; toast(error.message, 'error'); }
   }
 
+  async function lookupGeneration() {
+    const id = $('#usageRequestId').value.trim();
+    if (!id) { toast('شناسه درخواست را وارد کن.', 'error'); return; }
+    const btn = $('#lookupGeneration');
+    setBusy(btn, true, 'در حال تطبیق...');
+    try {
+      const result = await api('ai.lookup', 'POST', { type: 'generation', id });
+      displayResult('#generationLookupResult', result.data);
+    } catch (error) {
+      $('#generationLookupResult').textContent = error.message;
+      toast(error.message, 'error');
+    } finally {
+      setBusy(btn, false);
+    }
+  }
+
   async function loadUsage() {
     try {
       const result = await api('usage');
@@ -857,6 +873,7 @@
     $('#createBatch').addEventListener('click', createBatch);
     $('#getBatch').addEventListener('click', lookupBatch);
     $('#refreshUsage').addEventListener('click', loadUsage);
+    $('#lookupGeneration').addEventListener('click', lookupGeneration);
     $('#exportUsage').addEventListener('click', exportUsageCsv);
     $('#refreshAll').addEventListener('click', async () => {
       try { await loadBootstrap(); toast('اطلاعات به‌روزرسانی شد.'); } catch (error) { toast(error.message, 'error'); }
