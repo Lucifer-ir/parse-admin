@@ -500,7 +500,10 @@ if ($method === 'POST' && $path === '/ai/responses') {
     $call=ai_paasta_call($admin,'responses','POST','/responses',$payload,null,180);
     $output=ai_extract_text($call['data']);
     $requestId=$call['headers']['x-paasta-request-id']??($call['data']['paasta']['request_id']??null);
-    if(!empty($body['save_history'])) ai_save_history($admin,'response','Responses API',$model,$input,$output,(string)$requestId);
+    if(!empty($body['save_history'])) {
+        $historyPrompt=is_string($input)?$input:json_encode($input,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
+        ai_save_history($admin,'response','Responses API',$model,$historyPrompt,$output,(string)$requestId);
+    }
     app_json(200,['output'=>$output,'data'=>$call['data'],'request_id'=>$requestId]);
 }
 
