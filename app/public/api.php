@@ -273,7 +273,7 @@ if ($method === 'GET' && $path === '/platform/activities') {
       'SELECT a.id,a.activity_type,a.title,a.subject,a.level,a.due_at,a.status,
        (SELECT COUNT(*) FROM activity_questions aq WHERE aq.activity_id=a.id) question_count,
        (SELECT COUNT(*) FROM student_activity_assignments saa WHERE saa.activity_id=a.id) student_count,
-       (SELECT COUNT(*) FROM activity_submissions sub WHERE sub.activity_id=a.id AND sub.status IN (\\'submitted\\',\\'reviewed\\')) submitted_count
+       (SELECT COUNT(*) FROM activity_submissions sub WHERE sub.activity_id=a.id AND sub.status IN (\'submitted\',\'reviewed\')) submitted_count
        FROM learning_activities a ORDER BY a.id DESC'
     )->fetchAll();
     app_json(200,['rows'=>$rows]);
@@ -293,7 +293,7 @@ if ($method === 'POST' && $path === '/platform/activities') {
       $pdo->prepare('INSERT INTO learning_activities(activity_type,title,description,subject,level,track_id,instructions,due_at,status,created_by) VALUES(?,?,?,?,?,?,?,?,?,?)')
        ->execute([$type,$title,trim((string)($body['description']??''))?:null,trim((string)($body['subject']??''))?:null,trim((string)($body['level']??''))?:null,!empty($body['track_id'])?(int)$body['track_id']:null,trim((string)($body['instructions']??''))?:null,$due,$status,(int)$admin['id']]);
       $activityId=(int)$pdo->lastInsertId();
-      $valid=$pdo->prepare('SELECT id FROM question_bank WHERE id=? AND status=\\'published\\'');
+      $valid=$pdo->prepare('SELECT id FROM question_bank WHERE id=? AND status=\'published\'');
       $link=$pdo->prepare('INSERT INTO activity_questions(activity_id,question_id,position) VALUES(?,?,?)');
       foreach($questionIds as $index=>$qid){$valid->execute([$qid]);if(!$valid->fetchColumn())throw new InvalidArgumentException('تمام سؤال‌ها باید ابتدا در بانک سؤال منتشر شوند.');$link->execute([$activityId,$qid,$index+1]);}
       $targetIds=array_values(array_unique(array_filter(array_map('intval',(array)($body['target_student_ids']??[])),static fn($id)=>$id>0)));
@@ -614,7 +614,7 @@ if ($method === 'GET' && $path === '/platform/questions') {
         'SELECT q.id,q.resource_id,q.target_student_id,q.track_id,t.track_title,s.name AS student_name,q.subject,q.level,q.skill,q.question_type,
                 q.question_text,q.options_json,q.answer_json,q.explanation,q.difficulty,q.points,q.status,q.created_at
          FROM question_bank q LEFT JOIN students s ON s.id=q.target_student_id LEFT JOIN learning_tracks t ON t.id=q.track_id
-         WHERE (?=\\'\\' OR q.question_text LIKE ? OR q.subject LIKE ?)
+         WHERE (?=\'\' OR q.question_text LIKE ? OR q.subject LIKE ?)
          ORDER BY q.id DESC LIMIT ?'
     );
     $term = '%' . $q . '%';
