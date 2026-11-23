@@ -343,7 +343,7 @@ if ($method === 'GET' && preg_match('#^/platform/activity-submissions/([1-9][0-9
     $id=(int)$m[1];
     $head=app_db()->prepare('SELECT sub.*,a.title activity_title,s.name student_name,s.username FROM activity_submissions sub JOIN learning_activities a ON a.id=sub.activity_id JOIN students s ON s.id=sub.student_id WHERE sub.id=?');
     $head->execute([$id]);$submission=$head->fetch();if(!$submission)app_json(404,['error'=>'پاسخ تمرین پیدا نشد.']);
-    $rows=app_db()->prepare('SELECT aa.id,q.question_text,q.question_type,q.options_json,q.answer_json correct_answer,aa.answer_json student_answer,aa.is_correct,aa.awarded_points,aa.teacher_feedback,aq.points FROM activity_answers aa JOIN question_bank q ON q.id=aa.question_id JOIN activity_questions aq ON aq.question_id=q.id AND aq.activity_id=? WHERE aa.submission_id=? ORDER BY aq.position');
+    $rows=app_db()->prepare('SELECT aa.id,q.question_text,q.question_type,q.options_json,q.answer_json correct_answer,aa.answer_json student_answer,aa.is_correct,aa.awarded_points,aa.teacher_feedback,q.points AS points FROM activity_answers aa JOIN question_bank q ON q.id=aa.question_id JOIN activity_questions aq ON aq.question_id=q.id AND aq.activity_id=? WHERE aa.submission_id=? ORDER BY aq.position');
     $rows->execute([(int)$submission['activity_id'],$id]);
     app_json(200,['submission'=>$submission,'answers'=>$rows->fetchAll()]);
 }
@@ -351,12 +351,12 @@ if ($method === 'GET' && preg_match('#^/platform/activity-submissions/([1-9][0-9
 if ($method === 'POST' && preg_match('#^/platform/activity-answers/([1-9][0-9]*)/grade$#',$path,$m)) {
     $answerId=(int)$m[1];$body=app_request_json();$points=max(0,(float)($body['awarded_points']??0));$feedback=trim((string)($body['teacher_feedback']??''));
     $pdo=app_db();$stmt=$pdo->prepare('SELECT submission_id,question_id FROM activity_answers WHERE id=?');$stmt->execute([$answerId]);$answer=$stmt->fetch();if(!$answer)app_json(404,['error'=>'پاسخ سؤال پیدا نشد.']);
-    $maxStmt=$pdo->prepare('SELECT aq.points,aq.activity_id FROM activity_questions aq JOIN activity_submissions sub ON sub.activity_id=aq.activity_id WHERE aq.question_id=? AND sub.id=?');
+    $maxStmt=$pdo->prepare('SELECT q.points,aq.activity_id FROM activity_questions aq JOIN question_bank q ON q.id=aq.question_id JOIN activity_submissions sub ON sub.activity_id=aq.activity_id WHERE aq.question_id=? AND sub.id=?');
     $maxStmt->execute([(int)$answer['question_id'],(int)$answer['submission_id']]);$max=$maxStmt->fetch();
     if(!$max||$points>(float)$max['points'])app_json(422,['error'=>'نمره از بارم سؤال بیشتر است.']);
     $pdo->prepare('UPDATE activity_answers SET awarded_points=?,teacher_feedback=? WHERE id=?')->execute([$points,$feedback?:null,$answerId]);
     $sum=$pdo->prepare('SELECT COALESCE(SUM(awarded_points),0) FROM activity_answers WHERE submission_id=?');$sum->execute([(int)$answer['submission_id']]);$score=(float)$sum->fetchColumn();
-    $total=$pdo->prepare('SELECT COALESCE(SUM(points),0) FROM activity_questions WHERE activity_id=?');$total->execute([(int)$max['activity_id']]);$totalPoints=(float)$total->fetchColumn();
+    $total=$pdo->prepare('SELECT COALESCE(SUM(q.points),0) FROM activity_questions aq JOIN question_bank q ON q.id=aq.question_id WHERE aq.activity_id=?');$total->execute([(int)$max['activity_id']]);$totalPoints=(float)$total->fetchColumn();
     $pending=$pdo->prepare('SELECT COUNT(*) FROM activity_answers WHERE submission_id=? AND is_correct IS NULL AND awarded_points IS NULL');
     $pending->execute([(int)$answer['submission_id']]);
     $reviewStatus=(int)$pending->fetchColumn()===0?'reviewed':'submitted';
