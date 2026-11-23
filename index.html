@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#f4f6fa"><title>Parse Admin</title>
-<link rel="stylesheet" href="./assets/style.css?v=20261123-login-fix-4">
+<link rel="stylesheet" href="./assets/style.css?v=20261123-login-fix-5">
 </head>
 <body>
 <main class="shell">
@@ -18,7 +18,12 @@
       <button class="primary" type="submit">ورود به پنل <span>←</span></button>
       <p id="loginError" class="error" role="alert" aria-live="assertive"></p>
     </form>
-ils>
+    <details class="api-config">
+      <summary>تنظیم API قبل از ورود</summary>
+      <label>آدرس API<input id="loginApi" type="url" inputmode="url" autocomplete="url" placeholder="https://api.aiparseh.ir"></label>
+      <div class="inline-actions"><button id="saveLoginApi" class="secondary" type="button">ذخیره آدرس</button><button id="testLoginApi" class="text-button" type="button">تست اتصال</button></div>
+      <p id="loginApiMessage" class="hint" aria-live="polite">آدرس API ذخیره‌شده یا آدرس پیش‌فرض استفاده می‌شود.</p>
+    </details>
   </section>
 </section>
 <section id="dashboard" hidden>
@@ -36,5 +41,5 @@ ils>
 <section id="settingsPanel" class="content-panel" hidden><div class="section-head"><div><h3>تنظیمات اتصال</h3><p class="muted">آدرس سرویس مرکزی را مدیریت و اتصال را بررسی کنید.</p></div></div><div class="settings-form"><label>Base URL سرویس API<input id="apiSettings" type="url" placeholder="https://api.example.com"></label><div class="inline-actions"><button id="saveDashboardApi" class="primary" type="button">ذخیره تنظیمات</button><button id="checkDashboardApi" class="secondary" type="button">بررسی سلامت API</button></div><p id="dashboardSettingsMessage" class="hint"></p></div><div class="security-note"><strong>نکته امنیتی</strong><p>توکن ورود فقط تا پایان نشست مرورگر نگهداری می‌شود. برای استفاده عمومی، API باید از HTTPS و CORS محدودشده به دامنه پنل استفاده کند.</p></div></section>
 <footer>Parse Admin <span>·</span> <span id="apiOrigin"></span></footer>
 </section>
-</main><div id="toast" class="toast" role="status"></div><script src="./assets/app.js?v=20261123-login-fix-4"></script>
+</main><div id="toast" class="toast" role="status"></div><script src="./assets/app.js?v=20261123-login-fix-5"></script>
 </body></html>
