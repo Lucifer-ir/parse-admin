@@ -10,7 +10,9 @@
   const TOKEN_KEY = 'parse_admin_token';
   const DEFAULT_API = 'https://api.aiparseh.ir';
 
-  let apiBase = normalizeBase(localStorage.getItem(API_KEY) || DEFAULT_API);
+  const savedApi = normalizeBase(localStorage.getItem(API_KEY) || '');
+  // Ignore stale placeholder URLs left by the earlier login-screen API form.
+  let apiBase = /example\\.com|example\\.org/i.test(savedApi) ? DEFAULT_API : (savedApi || DEFAULT_API);
   let token = sessionStorage.getItem(TOKEN_KEY) || '';
   let usersCache = [];
   let questionsCache = [];
