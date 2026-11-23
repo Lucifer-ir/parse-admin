@@ -6,17 +6,10 @@
   const dashboard = $('#dashboard');
   const loginForm = $('#loginForm');
   const loginError = $('#loginError');
+
   const API_KEY = 'parse_admin_api';
   const TOKEN_KEY = 'parse_admin_token';
   const DEFAULT_API = 'https://api.aiparseh.ir';
-
-  const savedApi = normalizeBase(localStorage.getItem(API_KEY) || '');
-  // Ignore stale placeholder URLs left by the earlier login-screen API form.
-  let apiBase = /(?:example[.]com|example[.]org)/i.test(savedApi) ? DEFAULT_API : (savedApi || DEFAULT_API);
-  let token = sessionStorage.getItem(TOKEN_KEY) || '';
-  let usersCache = [];
-  let questionsCache = [];
-  let toastTimer = null;
 
   function normalizeBase(value) {
     return String(value || '').trim().replace(/\/+$/, '');
@@ -29,11 +22,11 @@
     try {
       parsed = new URL(normalized);
     } catch {
-      throw new Error('فرمت آدرس API معتبر نیست. نمونه: https://api.aiparseh.ir');
+      throw new Error('آدرس API معتبر نیست. نمونه: https://api.aiparseh.ir');
     }
-    const isLocal = ['localhost', '127.0.0.1'].includes(parsed.hostname);
-    if (parsed.protocol !== 'https:' && !(isLocal && parsed.protocol === 'http:')) {
-      throw new Error('برای امنیت ورود، آدرس API باید HTTPS باشد.');
+    const localHost = ['localhost', '127.0.0.1'].includes(parsed.hostname);
+    if (parsed.protocol !== 'https:' && !(localHost && parsed.protocol === 'http:')) {
+      throw new Error('آدرس API باید HTTPS باشد.');
     }
     if (parsed.username || parsed.password || parsed.search || parsed.hash) {
       throw new Error('آدرس API نباید شامل نام کاربری، رمز، Query یا Fragment باشد.');
@@ -41,17 +34,25 @@
     return normalized;
   }
 
-  function setApiBase(value) {
-    apiBase = validateApiUrl(value);
-    localStorage.setItem(API_KEY, apiBase);
-    if ($('#apiSettings')) $('#apiSettings').value = apiBase;
-    if ($('#loginApi')) $('#loginApi').value = apiBase;
-    $('#apiOrigin').textContent = new URL(apiBase).host;
+  function loadSavedApi() {
+    const saved = normalizeBase(localStorage.getItem(API_KEY) || '');
+    if (!saved || /(?:example[.]com|example[.]org)/i.test(saved)) return DEFAULT_API;
+    try {
+      return validateApiUrl(saved);
+    } catch {
+      return DEFAULT_API;
+    }
   }
 
-  function setLoginError(message, kind = 'error') {
+  let apiBase = loadSavedApi();
+  let token = sessionStorage.getItem(TOKEN_KEY) || '';
+  let usersCache = [];
+  let questionsCache = [];
+  let toastTimer = null;
+
+  function setLoginError(message) {
     loginError.textContent = message || '';
-    loginError.dataset.kind = kind;
+    loginError.hidden = !message;
   }
 
   function notify(message) {
@@ -59,7 +60,7 @@
     toast.textContent = message;
     toast.classList.add('visible');
     if (toastTimer) clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => toast.classList.remove('visible'), 3500);
+    toastTimer = setTimeout(() => toast.classList.remove('visible'), 4500);
   }
 
   function formatNumber(value) {
@@ -72,12 +73,19 @@
     return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString('fa-IR');
   }
 
+  function safeText(value) {
+    return String(value ?? '').replace(/[&<>"']/g, char => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[char]));
+  }
+
   function extractMessage(payload, fallback) {
     if (!payload || typeof payload !== 'object') return fallback;
     const detail = payload.detail ?? payload.message ?? payload.error;
     if (typeof detail === 'string' && detail.trim()) return detail;
     if (Array.isArray(detail)) {
-      return detail.map(item => item && typeof item.msg === 'string' ? item.msg : '').filter(Boolean).join('، ') || fallback;
+      const messages = detail.map(item => item && typeof item.msg === 'string' ? item.msg : '').filter(Boolean);
+      return messages.join('، ') || fallback;
     }
     return fallback;
   }
@@ -85,17 +93,20 @@
   async function request(path, options = {}, base = apiBase) {
     if (!base) throw new Error('آدرس API تنظیم نشده است.');
 
-    const headers = new Headers(options.headers || {});
-    if (token && options.auth !== false) headers.set('Authorization', 'Bearer ' + token);
-    if (options.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+    const { auth = true, ...fetchOptions } = options;
+    const headers = new Headers(fetchOptions.headers || {});
+    if (token && auth) headers.set('Authorization', 'Bearer ' + token);
+    if (fetchOptions.body && !headers.has('Content-Type')) {
+      headers.set('Content-Type', 'application/json');
+    }
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
     let response;
 
     try {
       response = await fetch(base + path, {
-        ...options,
+        ...fetchOptions,
         headers,
         signal: controller.signal,
         cache: 'no-store',
@@ -103,11 +114,11 @@
       });
     } catch (error) {
       if (error && error.name === 'AbortError') {
-        throw new Error('زمان پاسخ‌گویی API تمام شد. وضعیت سرور را بررسی کنید.');
+        throw new Error('سرور API در مهلت تعیین‌شده پاسخ نداد. وضعیت سرویس را بررسی کنید.');
       }
-      throw new Error('ارتباط با API برقرار نشد. DNS، SSL و CORS دامنه panel.aiparseh.ir را بررسی کنید.');
+      throw new Error('ارتباط با API برقرار نشد. DNS، گواهی SSL، فایروال و CORS دامنه پنل را بررسی کنید.');
     } finally {
-      clearTimeout(timeout);
+      clearTimeout(timeoutId);
     }
 
     const raw = await response.text();
@@ -116,26 +127,15 @@
       try {
         payload = JSON.parse(raw);
       } catch {
-        if (!response.ok) {
-          throw new Error('API خطای HTTP ' + response.status + ' برگرداند و پاسخ آن JSON معتبر نیست.');
-        }
-        throw new Error('پاسخ API معتبر نیست؛ احتمالاً مسیر API به‌درستی به PHP متصل نشده است.');
+        if (!response.ok) throw new Error('خطای HTTP ' + response.status + ' از API دریافت شد.');
+        throw new Error('پاسخ API قالب JSON ندارد. مسیر Nginx و اجرای PHP را بررسی کنید.');
       }
     }
 
     if (!response.ok) {
-      const fallback = 'خطای HTTP ' + response.status;
-      throw new Error(extractMessage(payload, fallback));
+      throw new Error(extractMessage(payload, 'خطای HTTP ' + response.status));
     }
     return payload;
-  }
-
-  async function checkHealth(base = apiBase) {
-    const result = await request('/health', { method: 'GET', auth: false }, base);
-    if (!result || result.status !== 'ok') {
-      throw new Error('API پاسخ سلامت معتبر برنگرداند.');
-    }
-    return result;
   }
 
   function switchToLogin(message = '') {
@@ -147,19 +147,26 @@
   function switchToDashboard(user) {
     loginView.hidden = true;
     dashboard.hidden = false;
-    $('#adminName').textContent = user && user.email ? user.email : 'مدیر سیستم';
+    $('#adminName').textContent = user?.email || 'مدیر سیستم';
     $('#apiSettings').value = apiBase;
     $('#apiOrigin').textContent = new URL(apiBase).host;
   }
 
-  function safeText(value) {
-    return String(value ?? '').replace(/[&<>"']/g, char => ({
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#39;'
-    }[char]));
+  function clearSession() {
+    token = '';
+    sessionStorage.removeItem(TOKEN_KEY);
+  }
+
+  async function loadUsers() {
+    const result = await request('/admin/users');
+    usersCache = Array.isArray(result) ? result : (Array.isArray(result.users) ? result.users : []);
+    renderUsers();
+  }
+
+  async function loadQuestions() {
+    const result = await request('/admin/questions?limit=200&offset=0');
+    questionsCache = Array.isArray(result) ? result : (Array.isArray(result.questions) ? result.questions : []);
+    renderQuestions();
   }
 
   function renderUsers() {
@@ -184,171 +191,130 @@
       : '<tr><td colspan="6" class="empty">سؤالی پیدا نشد.</td></tr>';
   }
 
-  async function loadUsers() {
-    const result = await request('/admin/users');
-    usersCache = Array.isArray(result) ? result : (Array.isArray(result.users) ? result.users : []);
-    renderUsers();
-  }
-
-  async function loadQuestions() {
-    const result = await request('/admin/questions?limit=200&offset=0');
-    questionsCache = Array.isArray(result) ? result : (Array.isArray(result.questions) ? result.questions : []);
-    renderQuestions();
-  }
-
-  async function loadDashboard() {
-    const me = await request('/auth/me');
-    if (!me || me.role !== 'admin' || me.active === false) {
-      throw new Error('این حساب دسترسی مدیر فعال ندارد.');
-    }
-
+  async function loadDashboardData() {
+    $('#connection').textContent = 'در حال دریافت اطلاعات...';
     const stats = await request('/admin/stats');
     $('#users').textContent = formatNumber(stats.users);
     $('#activeUsers').textContent = formatNumber(stats.active_users) + ' کاربر فعال';
     $('#sources').textContent = formatNumber(stats.sources);
     $('#questions').textContent = formatNumber(stats.questions);
     $('#serviceStatus').textContent = 'متصل';
-    $('#connection').textContent = 'اتصال برقرار است';
-    switchToDashboard(me);
+    $('#connection').textContent = 'اتصال به سرویس برقرار است';
 
     const results = await Promise.allSettled([loadUsers(), loadQuestions()]);
-    if (results.some(result => result.status === 'rejected')) {
-      const failed = results.find(result => result.status === 'rejected');
-      notify('ورود موفق بود، اما بخشی از اطلاعات بارگذاری نشد: ' + failed.reason.message);
+    const failed = results.find(result => result.status === 'rejected');
+    if (failed) notify('ورود موفق بود؛ اما بخشی از اطلاعات دریافت نشد: ' + failed.reason.message);
+  }
+
+  async function verifyCurrentSession() {
+    const me = await request('/auth/me');
+    if (!me || me.role !== 'admin' || me.active === false) {
+      throw new Error('این حساب دسترسی مدیر فعال ندارد.');
     }
+    return me;
   }
 
   async function refreshDashboard(showSuccess = true) {
-    $('#connection').textContent = 'در حال دریافت اطلاعات...';
+    $('#connection').textContent = 'در حال بررسی نشست...';
     try {
-      await loadDashboard();
+      const me = await verifyCurrentSession();
+      switchToDashboard(me);
+      await loadDashboardData();
       if (showSuccess) notify('اطلاعات پنل به‌روزرسانی شد.');
     } catch (error) {
       $('#connection').textContent = error.message;
       $('#serviceStatus').textContent = 'خطا';
-
-      if (/401|403|unauthorized|invalid or expired/i.test(error.message)) {
-        token = '';
-        sessionStorage.removeItem(TOKEN_KEY);
-        switchToLogin('نشست ورود معتبر نیست یا دسترسی مدیر ندارید. دوباره وارد شوید.');
+      if (/401|403|invalid|expired|authentication|required/i.test(error.message)) {
+        clearSession();
+        switchToLogin('نشست ورود معتبر نیست یا سطح دسترسی مدیر ندارید. دوباره وارد شوید.');
+      } else if (dashboard.hidden) {
+        switchToLogin(error.message);
       } else {
         notify(error.message);
-        if (dashboard.hidden) switchToLogin(error.message);
       }
     }
   }
 
-  // Configure and test API connection before submitting credentials.
-  $('#saveLoginApi')?.addEventListener('click', () => {
-    const message = $('#loginApiMessage');
-    try {
-      setApiBase($('#loginApi').value);
-      message.textContent = 'آدرس API ذخیره شد.';
-      setLoginError('');
-    } catch (error) {
-      message.textContent = error.message;
-    }
-  });
-
-  $('#testLoginApi')?.addEventListener('click', async () => {
-    const message = $('#loginApiMessage');
-    message.textContent = 'در حال بررسی اتصال...';
-    try {
-      const candidate = validateApiUrl($('#loginApi').value || apiBase);
-      const health = await checkHealth(candidate);
-      setApiBase(candidate);
-      message.textContent = 'اتصال موفق · ' + (health.service || 'API') + ' · ' + (health.version || '');
-      setLoginError('');
-    } catch (error) {
-      message.textContent = 'خطای اتصال: ' + error.message;
-      setLoginError(error.message);
-    }
-  });
-
+  // Login deliberately calls /auth/login directly. /health is only a diagnostic
+  // action in Settings and must not block a valid login.
   loginForm.addEventListener('submit', async event => {
     event.preventDefault();
     setLoginError('');
 
-    let base;
-    try {
-      base = validateApiUrl(apiBase);
-    } catch (error) {
-      setLoginError(error.message);
+    const email = $('#username').value.trim().toLowerCase();
+    const password = $('#password').value;
+    if (!email || !password) {
+      setLoginError('ایمیل و رمز عبور را وارد کنید.');
       return;
     }
 
     const submit = loginForm.querySelector('button[type="submit"]');
-    const originalLabel = 'ورود به پنل';
     submit.disabled = true;
-    submit.textContent = 'در حال بررسی اطلاعات...';
-    setLoginError('در حال اتصال به API و بررسی حساب...');
+    submit.textContent = 'در حال ورود...';
+    setLoginError('در حال ارسال درخواست ورود به سرور...');
 
     try {
-      try {
-        await checkHealth(base);
-      } catch (healthError) {
-        // Recover from stale custom/example URLs saved by the older login form.
-        if (base === DEFAULT_API) throw healthError;
-        try {
-          await checkHealth(DEFAULT_API);
-          base = DEFAULT_API;
-          apiBase = DEFAULT_API;
-        } catch {
-          throw healthError;
-        }
-      }
-
       const result = await request('/auth/login', {
         method: 'POST',
         auth: false,
-        body: JSON.stringify({
-          email: $('#username').value.trim().toLowerCase(),
-          password: $('#password').value
-        })
-      }, base);
+        body: JSON.stringify({ email, password })
+      }, apiBase);
 
       if (!result || typeof result.access_token !== 'string' || !result.access_token) {
-        throw new Error('ورود انجام نشد: API توکن معتبر برنگرداند.');
+        throw new Error('پاسخ ورود معتبر نیست؛ توکن از API دریافت نشد.');
       }
 
-      setApiBase(base);
       token = result.access_token;
       sessionStorage.setItem(TOKEN_KEY, token);
+
+      let me;
+      try {
+        me = await verifyCurrentSession();
+      } catch (error) {
+        clearSession();
+        throw new Error('رمز عبور پذیرفته شد اما تأیید نشست ناموفق بود: ' + error.message);
+      }
+
+      setLoginError('');
+      switchToDashboard(me);
       $('#password').value = '';
 
-      await loadDashboard();
-      setLoginError('');
+      // Auth success is independent from dashboard widgets. A stats endpoint
+      // failure must not make the login appear to have failed.
+      try {
+        await loadDashboardData();
+      } catch (error) {
+        $('#serviceStatus').textContent = 'خطا';
+        $('#connection').textContent = error.message;
+        notify('ورود موفق بود؛ خطا در دریافت آمار پنل: ' + error.message);
+      }
       notify('با موفقیت وارد پنل شدید.');
     } catch (error) {
-      token = '';
-      sessionStorage.removeItem(TOKEN_KEY);
+      clearSession();
       switchToLogin();
-      setLoginError(error.message || 'ورود انجام نشد. پاسخ مشخصی از سرور دریافت نشد.');
+      setLoginError(error.message || 'ورود انجام نشد. خطای نامشخصی رخ داد.');
     } finally {
       submit.disabled = false;
-      submit.textContent = originalLabel;
+      submit.textContent = 'ورود به پنل ←';
     }
   });
 
+  // API address is only presented in the authenticated Settings area.
   $('#saveDashboardApi').addEventListener('click', () => {
-    const oldBase = apiBase;
+    const message = $('#dashboardSettingsMessage');
     try {
-      const newBase = validateApiUrl($('#apiSettings').value);
-      if (newBase !== oldBase) {
-        apiBase = newBase;
-        localStorage.setItem(API_KEY, apiBase);
-        token = '';
-        sessionStorage.removeItem(TOKEN_KEY);
-        $('#apiOrigin').textContent = new URL(apiBase).host;
-        switchToLogin('آدرس API ذخیره شد. برای ورود به سرویس جدید، دوباره وارد شوید.');
-        notify('آدرس API تغییر کرد؛ لطفاً دوباره وارد شوید.');
-        return;
-      }
+      const nextApi = validateApiUrl($('#apiSettings').value);
+      const changed = nextApi !== apiBase;
+      apiBase = nextApi;
       localStorage.setItem(API_KEY, apiBase);
-      $('#dashboardSettingsMessage').textContent = 'آدرس API ذخیره شد.';
-      notify('تنظیمات ذخیره شد.');
+      $('#apiOrigin').textContent = new URL(apiBase).host;
+      message.textContent = 'آدرس API ذخیره شد.';
+      if (changed) {
+        clearSession();
+        switchToLogin('آدرس API تغییر کرد. برای ورود به سرویس جدید دوباره وارد شوید.');
+      }
     } catch (error) {
-      $('#dashboardSettingsMessage').textContent = error.message;
+      message.textContent = error.message;
     }
   });
 
@@ -357,17 +323,16 @@
     message.textContent = 'در حال بررسی اتصال...';
     try {
       const candidate = validateApiUrl($('#apiSettings').value);
-      const health = await checkHealth(candidate);
+      const health = await request('/health', { method: 'GET', auth: false }, candidate);
+      if (!health || health.status !== 'ok') throw new Error('پاسخ سلامت API معتبر نیست.');
       const changed = candidate !== apiBase;
       apiBase = candidate;
       localStorage.setItem(API_KEY, apiBase);
       $('#apiOrigin').textContent = new URL(apiBase).host;
-      message.textContent = 'اتصال موفق است · نسخه ' + (health.version || 'نامشخص');
+      message.textContent = 'اتصال موفق · ' + (health.service || 'API') + ' · نسخه ' + (health.version || 'نامشخص');
       if (changed) {
-        token = '';
-        sessionStorage.removeItem(TOKEN_KEY);
-        switchToLogin('آدرس API جدید تست و ذخیره شد. برای ادامه دوباره وارد شوید.');
-        notify('آدرس API ذخیره شد؛ دوباره وارد شوید.');
+        clearSession();
+        switchToLogin('آدرس جدید تست و ذخیره شد. برای ادامه دوباره وارد شوید.');
       }
     } catch (error) {
       message.textContent = error.message;
@@ -380,10 +345,9 @@
     try {
       if (token) await request('/auth/logout', { method: 'POST' });
     } catch {
-      // Local logout must still succeed when the API is unavailable.
+      // Always clear local session even if the API cannot be reached.
     }
-    token = '';
-    sessionStorage.removeItem(TOKEN_KEY);
+    clearSession();
     switchToLogin('از حساب خارج شدید.');
   });
 
@@ -395,7 +359,6 @@
     if (!button) return;
     const id = Number(button.dataset.deleteQuestion);
     if (!Number.isSafeInteger(id) || id < 1 || !confirm('این سؤال حذف شود؟ این عملیات قابل بازگشت نیست.')) return;
-
     button.disabled = true;
     try {
       await request('/admin/questions/' + id, { method: 'DELETE' });
@@ -419,13 +382,20 @@
     });
   });
 
+  // Surface script/runtime failures visibly instead of silently leaving the form inert.
+  window.addEventListener('error', event => {
+    if (loginView && !loginView.hidden) {
+      setLoginError('خطای اجرای پنل: ' + (event.message || 'JavaScript error'));
+    }
+  });
+  window.addEventListener('unhandledrejection', event => {
+    const reason = event.reason && event.reason.message ? event.reason.message : String(event.reason || 'Unknown error');
+    if (loginView && !loginView.hidden) setLoginError('خطای غیرمنتظره: ' + reason);
+  });
+
   $('#apiSettings').value = apiBase;
-  if ($('#loginApi')) $('#loginApi').value = apiBase;
   $('#apiOrigin').textContent = new URL(apiBase).host;
 
-  if (token) {
-    refreshDashboard(false);
-  } else {
-    switchToLogin();
-  }
+  if (token) refreshDashboard(false);
+  else switchToLogin();
 })();
