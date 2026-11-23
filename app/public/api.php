@@ -118,7 +118,9 @@ function ai_paasta_call(
     }
 
     $data = ai_json_decode($raw);
-    $model = is_array($payload) && isset($payload['model']) ? (string)$payload['model'] : null;
+    $model = is_array($payload) && isset($payload['model'])
+        ? (string)$payload['model']
+        : (is_array($multipart) && isset($multipart['model']) ? (string)$multipart['model'] : null);
     ai_record_usage($admin, $operation, $endpoint, $model, $status, $data, $responseHeaders, $latency);
 
     if ($status < 200 || $status >= 300) {
