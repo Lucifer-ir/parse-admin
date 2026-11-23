@@ -59,7 +59,8 @@ function ai_paasta_call(
     string $endpoint,
     ?array $payload = null,
     ?array $multipart = null,
-    int $timeout = 120
+    int $timeout = 120,
+    string $baseUrl = PAASTA_AI_BASE
 ): array {
     if (!function_exists('curl_init')) {
         throw new RuntimeException('افزونه PHP cURL نصب نیست. php-curl را نصب کنید.');
@@ -77,7 +78,7 @@ function ai_paasta_call(
     if ($method !== 'GET') $headers[] = 'Idempotency-Key: ' . $idempotencyKey;
     if ($payload !== null && $multipart === null) $headers[] = 'Content-Type: application/json';
 
-    $url = PAASTA_AI_BASE . $endpoint;
+    $url = rtrim($baseUrl, '/') . $endpoint;
     $curl = curl_init($url);
     $responseHeaders = [];
     $options = [
@@ -123,9 +124,10 @@ function ai_paasta_call(
     if ($status < 200 || $status >= 300) {
         $code = $data['error']['code'] ?? $data['code'] ?? 'provider_error';
         $message = $data['error']['message'] ?? $data['detail'] ?? 'درخواست توسط سرویس هوش مصنوعی پذیرفته نشد.';
-        app_json($status >= 400 && $status <= 599 ? $status : 502, [
+        app_json(502, [
             'error' => is_string($message) ? $message : 'خطای سرویس هوش مصنوعی',
             'code' => is_string($code) ? $code : 'provider_error',
+            'provider_status' => $status,
             'request_id' => $responseHeaders['x-paasta-request-id'] ?? null,
         ]);
     }
@@ -349,6 +351,86 @@ if ($method === 'POST' && $path === '/generate') {
     app_json(200,['output'=>$output,'usage'=>$call['data']['usage']??null,'paasta'=>$call['data']['paasta']??null,'request_id'=>$requestId]);
 }
 
+if ($method === 'POST' && $path === '/ai/chat/stream') {
+    if (!function_exists('curl_init')) app_json(500,['error'=>'افزونه cURL نصب نیست.']);
+    $body=app_request_json();
+    $model=trim((string)($body['model']??''));
+    $message=trim((string)($body['message']??''));
+    if($model===''||$message==='') app_json(422,['error'=>'مدل و پیام الزامی هستند.']);
+    $apiKey=app_paasta_key();
+    if($apiKey==='') app_json(409,['error'=>'ابتدا کلید API پاستا را در تنظیمات ثبت کنید.']);
+
+    $messages=[];
+    $system=trim((string)($body['system']??''));
+    if($system!=='') $messages[]=['role'=>'system','content'=>mb_substr($system,0,10000)];
+    $messages[]=['role'=>'user','content'=>mb_substr($message,0,50000)];
+    $payload=['model'=>$model,'messages'=>$messages,'max_tokens'=>min(8192,max(64,(int)($body['max_tokens']??1024))),'stream'=>true,'stream_options'=>['include_usage'=>true]];
+    if(isset($body['temperature'])) $payload['temperature']=max(0,min(2,(float)$body['temperature']));
+    if(isset($body['tools']) && is_array($body['tools'])) $payload['tools']=$body['tools'];
+    if(isset($body['tool_choice'])) $payload['tool_choice']=$body['tool_choice'];
+    if(isset($body['response_format']) && is_array($body['response_format'])) $payload['response_format']=$body['response_format'];
+
+    $headers=['Authorization: Bearer '.$apiKey,'Content-Type: application/json','Accept: text/event-stream','Idempotency-Key: '.bin2hex(random_bytes(18))];
+    $responseHeaders=[];
+    $raw='';
+    $curl=curl_init(PAASTA_AI_BASE.'/chat/completions');
+    curl_setopt_array($curl,[
+        CURLOPT_POST=>true,
+        CURLOPT_POSTFIELDS=>json_encode($payload,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),
+        CURLOPT_HTTPHEADER=>$headers,
+        CURLOPT_RETURNTRANSFER=>false,
+        CURLOPT_CONNECTTIMEOUT=>15,
+        CURLOPT_TIMEOUT=>240,
+        CURLOPT_SSL_VERIFYPEER=>true,
+        CURLOPT_SSL_VERIFYHOST=>2,
+        CURLOPT_HEADERFUNCTION=>static function($ch,string $line) use (&$responseHeaders):int{
+            $length=strlen($line);$parts=explode(':',$line,2);
+            if(count($parts)===2)$responseHeaders[strtolower(trim($parts[0]))]=trim($parts[1]);
+            return $length;
+        },
+        CURLOPT_WRITEFUNCTION=>static function($ch,string $chunk) use (&$raw):int{
+            $raw.=$chunk;
+            echo $chunk;
+            if(function_exists('ob_flush')) @ob_flush();
+            flush();
+            return strlen($chunk);
+        },
+    ]);
+    header('Content-Type: text/event-stream; charset=utf-8');
+    header('Cache-Control: no-cache, no-transform');
+    header('Connection: keep-alive');
+    header('X-Accel-Buffering: no');
+    header('Content-Security-Policy: default-src none');
+    while(ob_get_level()>0) @ob_end_flush();
+    $started=microtime(true);
+    $ok=curl_exec($curl);
+    $curlError=curl_error($curl);
+    $status=(int)curl_getinfo($curl,CURLINFO_RESPONSE_CODE);
+    $latency=(int)round((microtime(true)-$started)*1000);
+    curl_close($curl);
+
+    $usageData=[];
+    foreach(preg_split('/\\r?\\n/',$raw) as $line){
+        if(!str_starts_with($line,'data:')) continue;
+        $chunk=trim(substr($line,5));
+        if($chunk===''||$chunk==='[DONE]') continue;
+        $decoded=json_decode($chunk,true);
+        if(is_array($decoded)&&isset($decoded['usage'])) $usageData['usage']=$decoded['usage'];
+        if(is_array($decoded)&&isset($decoded['paasta'])) $usageData['paasta']=$decoded['paasta'];
+    }
+    if($ok===false){
+        error_log('Paasta streaming transport error: '.$curlError);
+        echo "event: error\ndata: ".json_encode(['error'=>'ارتباط جریانی با درگاه هوش مصنوعی قطع شد.'])."\n\n";
+        exit;
+    }
+    ai_record_usage($admin,'chat_stream','/chat/completions',$model,$status,$usageData,$responseHeaders,$latency);
+    if($status<200||$status>=300){
+        error_log('Paasta streaming returned HTTP '.$status);
+        echo "\nevent: error\ndata: ".json_encode(['error'=>'درخواست جریانی توسط درگاه رد شد.','provider_status'=>$status,'request_id'=>$responseHeaders['x-paasta-request-id']??null],JSON_UNESCAPED_UNICODE)."\n\n";
+    }
+    exit;
+}
+
 if ($method === 'POST' && $path === '/ai/chat') {
     $body=app_request_json();
     $model=trim((string)($body['model']??''));
@@ -365,6 +447,18 @@ if ($method === 'POST' && $path === '/ai/chat') {
     $requestId=$call['headers']['x-paasta-request-id']??($call['data']['paasta']['request_id']??null);
     if(!empty($body['save_history'])) ai_save_history($admin,'chat','گفت‌وگوی هوش مصنوعی',$model,$message,$output,(string)$requestId);
     app_json(200,['output'=>$output,'usage'=>$call['data']['usage']??null,'paasta'=>$call['data']['paasta']??null,'request_id'=>$requestId]);
+}
+
+if ($method === 'POST' && $path === '/ai/messages') {
+    $body=app_request_json();
+    $model=trim((string)($body['model']??''));
+    $message=trim((string)($body['message']??''));
+    if($model===''||$message==='') app_json(422,['error'=>'مدل و پیام الزامی هستند.']);
+    $payload=['model'=>$model,'max_tokens'=>min(8192,max(64,(int)($body['max_tokens']??1024))),'messages'=>[['role'=>'user','content'=>mb_substr($message,0,50000)]]];
+    if(!empty($body['system'])) $payload['system']=mb_substr((string)$body['system'],0,10000);
+    $call=ai_paasta_call($admin,'anthropic_messages','POST','/messages',$payload,null,180,'https://console.paasta.cloud/api/ai');
+    $output=ai_extract_text($call['data']);
+    app_json(200,['output'=>$output,'data'=>$call['data'],'request_id'=>$call['headers']['x-paasta-request-id']??null]);
 }
 
 if ($method === 'POST' && $path === '/ai/responses') {
