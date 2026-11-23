@@ -44,8 +44,23 @@ PHP_FPM_SERVICE="php${PHP_VERSION}-fpm"
 PHP_FPM_SOCK="/run/php/php${PHP_VERSION}-fpm.sock"
 systemctl enable --now "$PHP_FPM_SERVICE" mysql nginx
 [[ -S "$PHP_FPM_SOCK" ]] || { echo "PHP-FPM socket missing: $PHP_FPM_SOCK" >&2; exit 1; }
+cat > "/etc/php/$PHP_VERSION/fpm/conf.d/99-parse-admin.ini" <<'PHPINI'
+expose_php=Off
+display_errors=Off
+log_errors=On
+upload_max_filesize=20M
+post_max_size=22M
+max_execution_time=360
+max_input_time=360
+memory_limit=256M
+max_file_uploads=3
+zlib.output_compression=Off
+session.use_strict_mode=1
+session.cookie_httponly=1
+session.cookie_secure=1
+PHPINI
 
-echo "[3/7] Checking PHP and JavaScript syntax..."
+echo "[3/7] Checking PHP and shell syntax..."
 find "$REPO_DIR/app" -type f -name '*.php' -print0 | xargs -0 -n1 php -l
 php -l "$REPO_DIR/backend/config.php"
 php -l "$REPO_DIR/backend/public/index.php"
@@ -114,6 +129,9 @@ server {
         fastcgi_pass unix:$PHP_FPM_SOCK;
         fastcgi_param SCRIPT_FILENAME $REPO_DIR/app/public/index.php;
         fastcgi_param DOCUMENT_ROOT $REPO_DIR/app/public;
+        fastcgi_read_timeout 360s;
+        fastcgi_send_timeout 360s;
+        fastcgi_buffering off;
         fastcgi_hide_header X-Powered-By;
     }
 
