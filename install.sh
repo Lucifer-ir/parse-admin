@@ -90,7 +90,7 @@ install -d -o root -g www-data -m 0750 /opt/parse-admin/backend
 chown -R root:www-data "$INSTALL_DIR/backend"
 find "$INSTALL_DIR/backend" -type d -exec chmod 0750 {} \;
 find "$INSTALL_DIR/backend" -type f -exec chmod 0640 {} \;
-install -o root -g www-data -m 0640 "$INSTALL_DIR/backend/config.php" "$INSTALL_DIR/backend/config.php"
+# PHP config is readable only by root and the www-data group through restrictive directory/file modes.
 
 cat > /etc/parse-api.env <<ENV
 DB_HOST=localhost
