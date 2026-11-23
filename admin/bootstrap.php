@@ -189,7 +189,7 @@ function admin_ai_call(PDO $pdo, string $operation, string $method, string $path
     $responseHeaders = [];
     $headers = [
         'Authorization: Bearer ' . $apiKey,
-        'Accept: application/json',
+        'Accept: ' . (!empty($body['stream']) ? 'text/event-stream' : 'application/json'),
         'User-Agent: ParseAdmin/1.0',
     ];
     if ($body !== null) {
