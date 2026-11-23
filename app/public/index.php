@@ -303,7 +303,7 @@ $assetVersion = max(
           <div class="form-two"><label>نام کاربری<input class="input" name="username" required minlength="3"></label><label>کد دانش‌آموزی<input class="input" name="student_code"></label></div>
           <div class="form-two"><label>شماره تماس<input class="input" name="phone" dir="ltr"></label><label>ایمیل<input class="input" name="email" type="email" dir="ltr"></label></div>
           <label>کلاس / گروه<input class="input" name="group_name" placeholder="مثلاً گروه عصر"></label><p class="muted-label">سطح و زبان از مسیر آموزشی انتخاب‌شده تعیین می‌شود.</p>
-          <label>مسیر آموزشی<select class="input" name="track_id"><option value="">بدون مسیر مشخص</option></select></label>
+          <label>مسیر آموزشی<select class="input" name="track_id" required><option value="">انتخاب مسیر، زبان و سطح</option></select></label>
           <label>رمز عبور اولیه<input class="input" name="password" type="password" minlength="8" autocomplete="new-password" required></label>
           <button class="button button-primary full-button" type="submit">ساخت حساب دانش‌آموز</button><div class="form-message" id="studentCreateMessage"></div>
         </form>
@@ -330,7 +330,7 @@ $assetVersion = max(
         <form class="panel-card form-panel" id="resourceCreateForm"><h3>افزودن کتاب یا منبع</h3>
           <label>عنوان<input class="input" name="title" required></label>
           <div class="form-two"><label>نوع<select class="input" name="resource_type"><option value="book">کتاب</option><option value="handout">جزوه</option><option value="lesson">درس</option><option value="course">دوره</option><option value="source">فایل منبع AI</option></select></label><label>درس / رشته<input class="input" name="subject"></label></div>
-          <div class="form-two"><label>سطح<input class="input" name="level" placeholder="مثلاً B1"></label><label>نمایش در اپ<select class="input" name="published"><option value="0">پیش‌نویس</option><option value="1">منتشر شود</option></select></label></div>
+          <div class="form-two"><label>نمایش در اپ<select class="input" name="published"><option value="0">پیش‌نویس</option><option value="1">منتشر شود</option></select></label></div>
           <label>مسیر آموزشی<select class="input" name="track_id"><option value="">بدون مسیر مشخص</option></select></label>
           <label>توضیحات<textarea class="input textarea" name="description" rows="2"></textarea></label>
           <label>فایل منبع (TXT / MD / PDF)<input class="input" type="file" name="resource_file" accept=".txt,.md,.pdf"></label>
@@ -382,7 +382,7 @@ $assetVersion = max(
           <label>زبان<select class="input" name="language_code" id="trackLanguage" required><option value="en">انگلیسی</option><option value="de">آلمانی</option><option value="fr">فرانسوی</option></select></label>
           <label>رشته / مسیر<input class="input" name="track_title" placeholder="زبان عمومی" required></label>
           <label>دوره آموزشی<input class="input" name="course_title" placeholder="دوره مکالمه بزرگسالان" required></label>
-          <div class="form-two"><label>سطح<select class="input" name="level_code" id="trackLevel" required></select></label><label>نوع کلاس<select class="input" name="class_type_id" id="trackClassType"><option value="">انتخاب نوع کلاس</option></select></label></div>
+          <div class="form-two"><label>سطح<select class="input" name="level_code" id="trackLevel" required></select></label><label>نوع کلاس<select class="input" name="class_type_id" id="trackClassType" required><option value="">انتخاب نوع کلاس</option></select></label></div>
           <label>توضیحات<textarea class="input textarea" name="description" rows="2"></textarea></label>
           <button class="button button-primary full-button" type="submit">ذخیره مسیر آموزشی</button><div class="form-message" id="trackCreateMessage"></div>
         </form>
@@ -397,7 +397,7 @@ $assetVersion = max(
         </form>
         <div class="table-scroll"><table><thead><tr><th>نوع کلاس</th><th>شناسه</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody id="classTypeRows"></tbody></table></div>
       </section>
-      <section class="panel-card table-panel"><div class="table-scroll"><table><thead><tr><th>زبان</th><th>رشته</th><th>دوره</th><th>سطح</th><th>نوع کلاس</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody id="trackRows"><tr><td colspan="6" class="empty-cell">در حال دریافت...</td></tr></tbody></table></div></section>
+      <section class="panel-card table-panel"><div class="table-scroll"><table><thead><tr><th>زبان</th><th>رشته</th><th>دوره</th><th>سطح</th><th>نوع کلاس</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody id="trackRows"><tr><td colspan="7" class="empty-cell">در حال دریافت...</td></tr></tbody></table></div></section>
     </section>
 
     <section class="page-view" id="page-activities">
