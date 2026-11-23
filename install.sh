@@ -205,3 +205,6 @@ echo "Health check: https://$API_DOMAIN/health"
 echo "Database: $DB_NAME (localhost only; app user: $DB_USER)"
 echo "Admin credentials are not printed or stored in this log."
 echo "Log: $LOG_FILE"
+
+echo "[FINAL] Deploying the PHP-rendered administration console..."
+bash "$INSTALL_DIR/update-panel.sh"
