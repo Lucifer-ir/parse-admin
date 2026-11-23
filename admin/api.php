@@ -201,6 +201,30 @@ try {
         ]);
     }
 
+    if ($method === 'POST' && $action === 'knowledge.search') {
+        $knowledgeBaseId = trim((string)($input['knowledge_base_id'] ?? ''));
+        if ($knowledgeBaseId === '' || strlen($knowledgeBaseId) > 160 ||
+            !preg_match('/^[A-Za-z0-9_-]+$/', $knowledgeBaseId)) {
+            admin_json(422, ['ok' => false, 'message' => 'شناسه Knowledge Base معتبر نیست.']);
+        }
+        $query = trim((string)($input['query'] ?? ''));
+        if ($query === '' || mb_strlen($query) > 4000) {
+            admin_json(422, ['ok' => false, 'message' => 'متن جست‌وجو الزامی و حداکثر ۴۰۰۰ نویسه است.']);
+        }
+        $body = [
+            'query' => $query,
+            'top_k' => min(20, max(1, (int)($input['top_k'] ?? 5))),
+            'retrieval_mode' => in_array(($input['retrieval_mode'] ?? 'hybrid'), ['hybrid','semantic','keyword'], true)
+                ? $input['retrieval_mode'] : 'hybrid',
+        ];
+        $result = ensure_ai_http(admin_ai_call(
+            $pdo, 'knowledge.search', 'POST',
+            'knowledge-bases/' . rawurlencode($knowledgeBaseId) . '/search',
+            $body, 90
+        ));
+        admin_json(200, ['ok' => true, 'data' => $result['json'] ?? [], 'request_id' => $result['request_id']]);
+    }
+
     if ($method === 'POST' && $action === 'ai.lookup') {
         $type = (string)($input['type'] ?? '');
         $id = trim((string)($input['id'] ?? ''));
