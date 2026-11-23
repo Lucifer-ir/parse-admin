@@ -396,9 +396,13 @@ if ($method === 'POST' && $path === '/ai/chat/stream') {
         },
         CURLOPT_WRITEFUNCTION=>static function($ch,string $chunk) use (&$raw):int{
             $raw.=$chunk;
-            echo $chunk;
-            if(function_exists('ob_flush')) @ob_flush();
-            flush();
+            $httpStatus=(int)curl_getinfo($ch,CURLINFO_RESPONSE_CODE);
+            // Do not send provider error JSON as malformed SSE. Wait for status and return it as a proper SSE error event.
+            if($httpStatus>=200 && $httpStatus<300) {
+                echo $chunk;
+                if(function_exists('ob_flush')) @ob_flush();
+                flush();
+            }
             return strlen($chunk);
         },
     ]);
@@ -439,7 +443,13 @@ if ($method === 'POST' && $path === '/ai/chat/stream') {
     }
     if($status<200||$status>=300){
         error_log('Paasta streaming returned HTTP '.$status);
-        echo "\nevent: error\ndata: ".json_encode(['error'=>'درخواست جریانی توسط درگاه رد شد.','provider_status'=>$status,'request_id'=>$responseHeaders['x-paasta-request-id']??null],JSON_UNESCAPED_UNICODE)."\n\n";
+        $providerError=ai_json_decode($raw);
+        $message=$providerError['error']['message']??$providerError['detail']??'درخواست جریانی توسط درگاه رد شد.';
+        echo "\nevent: error\ndata: ".json_encode([
+            'error'=>is_string($message)?$message:'خطای Provider',
+            'provider_status'=>$status,
+            'request_id'=>$responseHeaders['x-paasta-request-id']??null
+        ],JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)."\n\n";
     }
     exit;
 }
