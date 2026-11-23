@@ -104,6 +104,7 @@ server {
 server {
     listen 443 ssl;
     listen [::]:443 ssl;
+    http2 on;
     server_name $PANEL_DOMAIN;
 
     root $REPO_DIR/app/public;
@@ -129,6 +130,7 @@ server {
         fastcgi_pass unix:$PHP_FPM_SOCK;
         fastcgi_param SCRIPT_FILENAME $REPO_DIR/app/public/index.php;
         fastcgi_param DOCUMENT_ROOT $REPO_DIR/app/public;
+        fastcgi_param HTTPS on;
         fastcgi_read_timeout 360s;
         fastcgi_send_timeout 360s;
         fastcgi_buffering off;
@@ -171,6 +173,9 @@ server {
         fastcgi_pass unix:$PHP_FPM_SOCK;
         fastcgi_param SCRIPT_FILENAME $REPO_DIR/app/public/index.php;
         fastcgi_param DOCUMENT_ROOT $REPO_DIR/app/public;
+        fastcgi_read_timeout 360s;
+        fastcgi_send_timeout 360s;
+        fastcgi_buffering off;
         fastcgi_hide_header X-Powered-By;
     }
 
