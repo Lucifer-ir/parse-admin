@@ -360,10 +360,13 @@ if ($method === 'POST' && $path === '/ai/chat/stream') {
     $apiKey=app_paasta_key();
     if($apiKey==='') app_json(409,['error'=>'ابتدا کلید API پاستا را در تنظیمات ثبت کنید.']);
 
-    $messages=[];
-    $system=trim((string)($body['system']??''));
-    if($system!=='') $messages[]=['role'=>'system','content'=>mb_substr($system,0,10000)];
-    $messages[]=['role'=>'user','content'=>mb_substr($message,0,50000)];
+    $messages=$body['messages']??null;
+    if(!is_array($messages)||count($messages)<1) {
+        $messages=[];
+        $system=trim((string)($body['system']??''));
+        if($system!=='') $messages[]=['role'=>'system','content'=>mb_substr($system,0,10000)];
+        $messages[]=['role'=>'user','content'=>mb_substr($message,0,50000)];
+    }
     $payload=['model'=>$model,'messages'=>$messages,'max_tokens'=>min(8192,max(64,(int)($body['max_tokens']??1024))),'stream'=>true,'stream_options'=>['include_usage'=>true]];
     if(isset($body['temperature'])) $payload['temperature']=max(0,min(2,(float)$body['temperature']));
     if(isset($body['tools']) && is_array($body['tools'])) $payload['tools']=$body['tools'];
@@ -435,14 +438,17 @@ if ($method === 'POST' && $path === '/ai/chat') {
     $body=app_request_json();
     $model=trim((string)($body['model']??''));
     $message=trim((string)($body['message']??''));
-    if($model===''||$message==='') app_json(422,['error'=>'مدل و پیام الزامی هستند.']);
-    $messages=[];
-    $system=trim((string)($body['system']??''));
-    if($system!=='') $messages[]=['role'=>'system','content'=>mb_substr($system,0,10000)];
-    $messages[]=['role'=>'user','content'=>mb_substr($message,0,50000)];
+    $messages=$body['messages']??null;
+    if($model===''||($message===''&&(!is_array($messages)||count($messages)<1))) app_json(422,['error'=>'مدل و پیام یا ساختار Messages الزامی هستند.']);
+    if(!is_array($messages)||count($messages)<1) {
+        $messages=[];
+        $system=trim((string)($body['system']??''));
+        if($system!=='') $messages[]=['role'=>'system','content'=>mb_substr($system,0,10000)];
+        $messages[]=['role'=>'user','content'=>mb_substr($message,0,50000)];
+    }
     $payload=['model'=>$model,'messages'=>$messages,'max_tokens'=>min(8192,max(64,(int)($body['max_tokens']??1024))),'stream'=>false];
     if(isset($body['temperature'])) $payload['temperature']=max(0,min(2,(float)$body['temperature']));
-    foreach(['tools','tool_choice','response_format','parallel_tool_calls','top_p','presence_penalty','frequency_penalty','seed','stop'] as $field) {
+    foreach(['tools','tool_choice','response_format','pdf_processing','parallel_tool_calls','top_p','presence_penalty','frequency_penalty','seed','stop'] as $field) {
         if(array_key_exists($field,$body)) $payload[$field]=$body[$field];
     }
     $call=ai_paasta_call($admin,'chat','POST','/chat/completions',$payload,null,180);
@@ -456,9 +462,12 @@ if ($method === 'POST' && $path === '/ai/messages') {
     $body=app_request_json();
     $model=trim((string)($body['model']??''));
     $message=trim((string)($body['message']??''));
-    if($model===''||$message==='') app_json(422,['error'=>'مدل و پیام الزامی هستند.']);
-    $payload=['model'=>$model,'max_tokens'=>min(8192,max(64,(int)($body['max_tokens']??1024))),'messages'=>[['role'=>'user','content'=>mb_substr($message,0,50000)]]];
+    $messages=$body['messages']??null;
+    if($model===''||($message===''&&(!is_array($messages)||count($messages)<1))) app_json(422,['error'=>'مدل و پیام یا ساختار Messages الزامی هستند.']);
+    if(!is_array($messages)||count($messages)<1) $messages=[['role'=>'user','content'=>mb_substr($message,0,50000)]];
+    $payload=['model'=>$model,'max_tokens'=>min(8192,max(64,(int)($body['max_tokens']??1024))),'messages'=>$messages];
     if(!empty($body['system'])) $payload['system']=mb_substr((string)$body['system'],0,10000);
+    if(isset($body['pdf_processing'])) $payload['pdf_processing']=$body['pdf_processing'];
     $call=ai_paasta_call($admin,'anthropic_messages','POST','/messages',$payload,null,180,'https://console.paasta.cloud/api/ai');
     $output=ai_extract_text($call['data']);
     app_json(200,['output'=>$output,'data'=>$call['data'],'request_id'=>$call['headers']['x-paasta-request-id']??null]);
@@ -467,9 +476,10 @@ if ($method === 'POST' && $path === '/ai/messages') {
 if ($method === 'POST' && $path === '/ai/responses') {
     $body=app_request_json();
     $model=trim((string)($body['model']??''));
-    $input=trim((string)($body['input']??''));
-    if($model===''||$input==='') app_json(422,['error'=>'مدل و ورودی الزامی هستند.']);
-    $payload=['model'=>$model,'input'=>mb_substr($input,0,50000),'max_output_tokens'=>min(8192,max(64,(int)($body['max_output_tokens']??1024))),'store'=>false,'stream'=>false];
+    $input=$body['input']??'';
+    if(is_string($input)) $input=mb_substr(trim($input),0,50000);
+    if($model===''||((is_string($input)&&$input==='')||(!is_string($input)&&(!is_array($input)||count($input)<1)))) app_json(422,['error'=>'مدل و ورودی معتبر الزامی هستند.']);
+    $payload=['model'=>$model,'input'=>$input,'max_output_tokens'=>min(8192,max(64,(int)($body['max_output_tokens']??1024))),'store'=>false,'stream'=>false];
     if(!empty($body['instructions'])) $payload['instructions']=mb_substr((string)$body['instructions'],0,10000);
     if(!empty($body['web_search'])) {
         $payload['tools']=[['type'=>'web_search']];
