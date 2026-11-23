@@ -235,6 +235,20 @@ function platform_question_type(string $type): string
     return in_array($type, $allowed, true) ? $type : 'multiple_choice';
 }
 
+function platform_track_level(PDO $pdo, ?int $trackId): ?string
+{
+    if ($trackId === null) return null;
+    $stmt=$pdo->prepare(
+      'SELECT t.level_code FROM learning_tracks t
+       INNER JOIN learning_levels lv ON lv.language_code=t.language_code AND lv.level_code=t.level_code AND lv.active=1
+       WHERE t.id=? AND t.active=1 LIMIT 1'
+    );
+    $stmt->execute([$trackId]);
+    $level=$stmt->fetchColumn();
+    if(!$level) app_json(422,['error'=>'مسیر آموزشی یا سطح آن معتبر و فعال نیست.']);
+    return (string)$level;
+}
+
 function platform_json_value(mixed $value): ?string
 {
     if ($value === null || $value === '') return null;
@@ -245,7 +259,7 @@ function platform_json_value(mixed $value): ?string
 if ($method === 'GET' && $path === '/platform/education-catalog') {
     $languages=app_db()->query("SELECT language_code,language_name,native_name FROM learning_languages WHERE active=1 ORDER BY sort_order,language_name")->fetchAll();
     $levels=app_db()->query("SELECT language_code,level_code,level_name,level_order FROM learning_levels WHERE active=1 ORDER BY language_code,level_order")->fetchAll();
-    $classTypes=app_db()->query("SELECT id,code,title,description FROM class_types WHERE active=1 ORDER BY sort_order,title")->fetchAll();
+    $classTypes=app_db()->query("SELECT id,code,title,description,active FROM class_types ORDER BY sort_order,title")->fetchAll();
     app_json(200,['languages'=>$languages,'levels'=>$levels,'class_types'=>$classTypes]);
 }
 
@@ -706,7 +720,7 @@ if ($method === 'GET' && $path === '/platform/questions') {
     $limit = min(200, max(1, (int)($_GET['limit'] ?? 100)));
     $stmt = app_db()->prepare(
         'SELECT q.id,q.resource_id,q.target_student_id,q.track_id,t.track_title,s.name AS student_name,q.subject,q.level,q.skill,q.question_type,
-                q.question_text,q.options_json,q.answer_json,q.explanation,q.difficulty,q.points,q.status,q.created_at
+                q.question_text,q.options_json,q.audio_url,q.answer_json,q.explanation,q.difficulty,q.points,q.status,q.created_at
          FROM question_bank q LEFT JOIN students s ON s.id=q.target_student_id LEFT JOIN learning_tracks t ON t.id=q.track_id
          WHERE (?=\'\' OR q.question_text LIKE ? OR q.subject LIKE ?)
          ORDER BY q.id DESC LIMIT ?'
@@ -739,13 +753,14 @@ if ($method === 'POST' && $path === '/platform/questions') {
             $difficulty = in_array(($item['difficulty'] ?? $body['difficulty'] ?? 'medium'), ['easy','medium','hard'], true)
                 ? ($item['difficulty'] ?? $body['difficulty'] ?? 'medium') : 'medium';
             $stmt = $pdo->prepare(
-                'INSERT INTO question_bank(resource_id,target_student_id,track_id,subject,level,skill,question_type,question_text,options_json,answer_json,explanation,difficulty,points,tags_json,status,created_by)
-                 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+                'INSERT INTO question_bank(resource_id,target_student_id,track_id,subject,level,skill,question_type,question_text,options_json,audio_url,answer_json,explanation,difficulty,points,tags_json,status,created_by)
+                 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
             );
             $stmt->execute([
                 $resourceId,$studentId,!empty($body['track_id']) ? (int)$body['track_id'] : null,$subject,
                 trim((string)($item['level'] ?? $body['level'] ?? '')) ?: null,$skill,$qType,
                 trim((string)$item['question_text']),platform_json_value($options),
+                trim((string)($item['audio_url'] ?? $body['audio_url'] ?? '')) ?: null,
                 platform_json_value($item['correct_answer'] ?? $item['answer'] ?? null),
                 trim((string)($item['explanation'] ?? '')) ?: null,$difficulty,
                 max(0.25,min(100,(float)($item['points'] ?? 1))),
@@ -818,11 +833,12 @@ if ($method === 'POST' && $path === '/platform/questions/generate') {
         if ($itemType === 'multiple_choice' && (!is_array($options) || count($options) !== 4)) {
           throw new InvalidArgumentException('مدل برای سؤال چندگزینه‌ای دقیقاً چهار گزینه تولید نکرد.');
         }
-        $stmt=$pdo->prepare('INSERT INTO question_bank(resource_id,target_student_id,track_id,subject,level,skill,question_type,question_text,options_json,answer_json,explanation,difficulty,points,tags_json,status,created_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
+        $stmt=$pdo->prepare('INSERT INTO question_bank(resource_id,target_student_id,track_id,subject,level,skill,question_type,question_text,options_json,audio_url,answer_json,explanation,difficulty,points,tags_json,status,created_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
         $stmt->execute([
           $resourceId,$targetStudentId,!empty($body['track_id']) ? (int)$body['track_id'] : null,$subject,$level,
           in_array(($body['skill'] ?? 'general'),['listening','speaking','reading','writing','grammar','vocabulary','general'],true)?$body['skill']:'general',
           $itemType,trim((string)$item['question_text']),platform_json_value($options),
+          trim((string)($item['audio_url'] ?? $body['audio_url'] ?? '')) ?: null,
           platform_json_value($item['correct_answer'] ?? null),trim((string)($item['explanation'] ?? '')) ?: null,
           in_array(($item['difficulty'] ?? ''),['easy','medium','hard'],true)?$item['difficulty']:'medium',
           max(0.25,min(100,(float)($item['points'] ?? 1))),platform_json_value($item['tags'] ?? []),'draft',(int)$admin['id']
