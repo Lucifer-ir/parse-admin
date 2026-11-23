@@ -65,12 +65,8 @@ PHPINI
 
 echo "[3/8] Checking PHP, JavaScript and Bash syntax..."
 find "$REPO_DIR/app" "$REPO_DIR/backend" -type f -name '*.php' -print0 | xargs -0 -n1 php -l
-if command -v node >/dev/null 2>&1; then
-  node --check "$REPO_DIR/app/public/assets/admin.js"
-else
-  echo "[WARN] Node.js is not installed; skipping the optional local JavaScript syntax check."
-  echo "[WARN] JavaScript syntax is validated by the repository CI workflow."
-fi
+# JavaScript syntax is checked by GitHub Actions.
+# Node.js is intentionally not a server deployment dependency.
 bash -n "$REPO_DIR/install.sh"
 bash -n "$REPO_DIR/update-panel.sh"
 bash -n "$REPO_DIR/backend/bin/backup-db.sh"
