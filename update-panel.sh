@@ -93,6 +93,14 @@ fi
 chown root:www-data /etc/parse-api.env
 chmod 0640 /etc/parse-api.env
 
+echo "[5/7] Creating a verified database backup before migration..."
+if [[ -x /usr/local/sbin/parse-admin-db-backup ]]; then
+  /usr/local/sbin/parse-admin-db-backup
+else
+  echo "The configured database backup utility is missing. Refusing to migrate without a backup." >&2
+  exit 1
+fi
+
 echo "[5/7] Applying additive AI console database migration..."
 for migration in "$REPO_DIR"/backend/migrations/*.sql; do
   [[ -f "$migration" ]] || continue
