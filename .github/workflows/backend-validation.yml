@@ -23,10 +23,10 @@ jobs:
           extensions: pdo_mysql, curl, mbstring, sodium
 
       - name: PHP syntax check
-        run: find backend app -type f -name '*.php' -print0 | xargs -0 -n1 php -l
-
-      - name: Shell syntax check
-        run: bash -n install.sh && bash -n update-panel.sh && bash -n backend/bin/backup-db.sh
+        run: find app backend -type f -name '*.php' -print0 | xargs -0 -n1 php -l
 
       - name: JavaScript syntax check
         run: node --check app/public/assets/admin.js
+
+      - name: Shell syntax check
+        run: bash -n install.sh && bash -n update-panel.sh && bash -n backend/bin/backup-db.sh
