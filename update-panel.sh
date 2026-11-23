@@ -135,7 +135,7 @@ server {
     listen [::]:80;
     server_name $PANEL_DOMAIN;
     location ^~ /.well-known/acme-challenge/ { root $WEB_ROOT; }
-    location / { return 301 https:\$host\$request_uri; }
+    location / { return 301 https://\$host\$request_uri; }
 }
 server {
     listen 443 ssl http2;
