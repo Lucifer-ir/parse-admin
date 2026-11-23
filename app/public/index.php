@@ -272,6 +272,7 @@ $assetVersion = max(
           <label>فایل متنی / جزوه<select class="input" name="resource_id" id="questionResource" required><option value="">انتخاب منبع آموزشی</option></select></label>
           <label>مدل<select class="input model-select" name="model" data-kind="models" required><option value="">انتخاب مدل</option></select></label>
           <div class="form-two"><label>درس / رشته<input class="input" name="subject" placeholder="مثلاً زبان انگلیسی" required></label><label>سطح<input class="input" name="level" placeholder="مثلاً A2 / پایه هفتم"></label></div>
+          <label>مسیر آموزشی<select class="input" name="track_id"><option value="">بدون مسیر مشخص</option></select></label>
           <div class="form-two"><label>مهارت<select class="input" name="skill"><option value="general">عمومی</option><option value="listening">Listening</option><option value="speaking">Speaking</option><option value="reading">Reading</option><option value="writing">Writing</option><option value="grammar">Grammar</option><option value="vocabulary">Vocabulary</option></select></label><label>نوع سؤال<select class="input" name="question_type"><option value="multiple_choice">چهارگزینه‌ای</option><option value="written">تشریحی</option><option value="true_false">درست / نادرست</option><option value="fill_blank">جای خالی</option><option value="matching">وصل‌کردنی</option><option value="ordering">مرتب‌سازی</option><option value="listening">شنیداری</option><option value="speaking">گفتاری</option></select></label></div>
           <div class="form-two"><label>تعداد سؤال<input class="input" type="number" name="count" value="10" min="1" max="40"></label><label>سطح دشواری<select class="input" name="difficulty"><option value="easy">آسان</option><option value="medium" selected>متوسط</option><option value="hard">سخت</option></select></label></div>
           <label>اختصاص به دانش‌آموز<select class="input" name="target_student_id" id="questionTargetStudent"><option value="">بانک عمومی</option></select></label>
@@ -302,6 +303,7 @@ $assetVersion = max(
           <div class="form-two"><label>نام کاربری<input class="input" name="username" required minlength="3"></label><label>کد دانش‌آموزی<input class="input" name="student_code"></label></div>
           <div class="form-two"><label>شماره تماس<input class="input" name="phone" dir="ltr"></label><label>ایمیل<input class="input" name="email" type="email" dir="ltr"></label></div>
           <div class="form-two"><label>سطح آموزشی<input class="input" name="level" placeholder="مثلاً A2"></label><label>کلاس / گروه<input class="input" name="group_name"></label></div>
+          <label>مسیر آموزشی<select class="input" name="track_id"><option value="">بدون مسیر مشخص</option></select></label>
           <label>رمز عبور اولیه<input class="input" name="password" type="password" minlength="8" autocomplete="new-password" required></label>
           <button class="button button-primary full-button" type="submit">ساخت حساب دانش‌آموز</button><div class="form-message" id="studentCreateMessage"></div>
         </form>
@@ -317,6 +319,7 @@ $assetVersion = max(
           <label>عنوان<input class="input" name="title" required></label>
           <div class="form-two"><label>نوع<select class="input" name="resource_type"><option value="book">کتاب</option><option value="handout">جزوه</option><option value="lesson">درس</option><option value="course">دوره</option><option value="source">فایل منبع AI</option></select></label><label>درس / رشته<input class="input" name="subject"></label></div>
           <div class="form-two"><label>سطح<input class="input" name="level" placeholder="مثلاً B1"></label><label>نمایش در اپ<select class="input" name="published"><option value="0">پیش‌نویس</option><option value="1">منتشر شود</option></select></label></div>
+          <label>مسیر آموزشی<select class="input" name="track_id"><option value="">بدون مسیر مشخص</option></select></label>
           <label>توضیحات<textarea class="input textarea" name="description" rows="2"></textarea></label>
           <label>فایل منبع (TXT / MD / PDF)<input class="input" type="file" name="resource_file" accept=".txt,.md,.pdf"></label>
           <label>متن منبع (اختیاری)<textarea class="input textarea" name="content_text" rows="5" placeholder="برای تولید سؤال از روی محتوا، متن را اینجا قرار دهید یا فایل TXT/MD بارگذاری کنید."></textarea></label>
@@ -333,6 +336,7 @@ $assetVersion = max(
         <form class="panel-card form-panel" id="examCreateForm"><h3>آزمون جدید</h3>
           <label>عنوان آزمون<input class="input" name="title" required></label>
           <div class="form-two"><label>درس<input class="input" name="subject"></label><label>سطح<input class="input" name="level"></label></div>
+          <label>مسیر آموزشی<select class="input" name="track_id"><option value="">بدون محدودیت مسیر</option></select></label>
           <div class="form-two"><label>مدت آزمون (دقیقه)<input class="input" name="duration_minutes" type="number" min="1" max="600" value="30"></label><label>نمره قبولی (%)<input class="input" name="passing_score" type="number" min="0" max="100" value="50"></label></div>
           <div class="form-two"><label>شروع (اختیاری)<input class="input" name="starts_at" type="datetime-local"></label><label>پایان (اختیاری)<input class="input" name="ends_at" type="datetime-local"></label></div>
           <label>اختصاص به دانش‌آموز<select class="input" name="target_student_id" id="examTargetStudent"><option value="">تمام دانش‌آموزان سطح انتخاب‌شده</option></select></label>
