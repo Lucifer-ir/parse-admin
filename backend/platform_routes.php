@@ -22,7 +22,8 @@ function parse_student_from_token(PDO $pdo): ?array
     $student = $stmt->fetch();
     if (!$student) return null;
     $pdo->prepare('UPDATE student_auth_tokens SET last_used_at=UTC_TIMESTAMP() WHERE id=?')->execute([(int)$student['token_id']]);
-    $pdo->prepare('UPDATE students SET last_seen_at=UTC_TIMESTAMP() WHERE id=?')->execute([(int)$student['id']]);
+    $platform = substr((string)($_SERVER['HTTP_X_PARSE_PLATFORM'] ?? 'unknown'), 0, 40);
+    $pdo->prepare('UPDATE students SET last_seen_at=UTC_TIMESTAMP(),last_seen_platform=? WHERE id=?')->execute([$platform,(int)$student['id']]);
     unset($student['token_id']);
     return $student;
 }
@@ -223,13 +224,16 @@ if ($method === 'POST' && preg_match('#^/activities/([1-9][0-9]*)/submit$#',$pat
          VALUES(?,?,?,?,?) ON DUPLICATE KEY UPDATE answer_json=VALUES(answer_json),is_correct=VALUES(is_correct),awarded_points=VALUES(awarded_points),answered_at=UTC_TIMESTAMP()'
       );
       $score=0.0;$total=0.0;$manual=0;
+      $totalStmt=$pdo->prepare('SELECT COALESCE(SUM(points),0) FROM activity_questions WHERE activity_id=?');
+      $totalStmt->execute([$activityId]);
+      $total=(float)$totalStmt->fetchColumn();
       foreach($answers as $entry){
         if(!is_array($entry))continue;
         $questionId=(int)($entry['question_id']??0);
         if($questionId<1||!array_key_exists('answer',$entry))continue;
         $allowed->execute([$activityId,$questionId]);$q=$allowed->fetch();
         if(!$q)continue;
-        $points=(float)$q['points'];$total+=$points;$given=$entry['answer'];
+        $points=(float)$q['points'];$given=$entry['answer'];
         $objective=in_array($q['question_type'],['multiple_choice','true_false','fill_blank','ordering'],true);
         if($objective){
           $correct=json_decode((string)$q['answer_json'],true);
