@@ -18,7 +18,7 @@ if ($origin !== '' && hash_equals((string)$config['CORS_ORIGIN'], $origin)) {
     header('Access-Control-Allow-Origin: ' . $origin);
     header('Vary: Origin');
     header('Access-Control-Allow-Headers: Authorization, Content-Type');
-    header('Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS');
+    header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
     header('Access-Control-Max-Age: 600');
 }
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') {
@@ -106,6 +106,8 @@ function audit(PDO $pdo, ?int $adminId, string $action, ?string $targetType = nu
 $method = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET'));
 $path = parse_url((string)($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH) ?: '/';
 $path = preg_replace('#^/api(?=/|$)#', '', $path) ?: '/';
+
+require_once __DIR__ . '/../platform_routes.php';
 
 if ($method === 'GET' && $path === '/health') {
     try {
