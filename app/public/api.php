@@ -234,6 +234,100 @@ if ($method === 'GET' && $path === '/dashboard') {
 
 if ($method === 'GET' && preg_match('#^/catalog/([a-z]+)$#', $path, $m)) ai_catalog($admin, $m[1]);
 
+if ($method === 'GET' && $path === '/prompts') {
+    $rows=app_db()->query('SELECT slug,title,generation_type,system_prompt,enabled,updated_at FROM ai_prompt_templates ORDER BY id ASC')->fetchAll();
+    app_json(200,['rows'=>$rows]);
+}
+
+if ($method === 'POST' && $path === '/prompts') {
+    $body=app_request_json();
+    $slug=trim((string)($body['slug']??''));
+    $prompt=trim((string)($body['system_prompt']??''));
+    $enabled=!empty($body['enabled'])?1:0;
+    if(!preg_match('/^[a-z0-9-]{2,80}$/',$slug)||$prompt===''||mb_strlen($prompt)>20000) {
+        app_json(422,['error'=>'شناسه قالب یا متن دستور معتبر نیست.']);
+    }
+    $stmt=app_db()->prepare('UPDATE ai_prompt_templates SET system_prompt=?,enabled=? WHERE slug=?');
+    $stmt->execute([$prompt,$enabled,$slug]);
+    $check=app_db()->prepare('SELECT id FROM ai_prompt_templates WHERE slug=?');
+    $check->execute([$slug]);
+    if(!$check->fetchColumn()) app_json(404,['error'=>'قالب موردنظر پیدا نشد.']);
+    app_json(200,['ok'=>true,'message'=>'قالب دستور با موفقیت ذخیره شد.']);
+}
+
+if ($method === 'GET' && $path === '/users') {
+    $q=trim((string)($_GET['q']??''));
+    $limit=min(200,max(1,(int)($_GET['limit']??100)));
+    $offset=max(0,min(1000000,(int)($_GET['offset']??0)));
+    $stmt=app_db()->prepare(
+        'SELECT id,email,role,active,created_at FROM users
+         WHERE (? = "" OR email LIKE ?)
+         ORDER BY id DESC LIMIT ? OFFSET ?'
+    );
+    $term='%'.$q.'%';
+    $stmt->bindValue(1,$q);
+    $stmt->bindValue(2,$term);
+    $stmt->bindValue(3,$limit,PDO::PARAM_INT);
+    $stmt->bindValue(4,$offset,PDO::PARAM_INT);
+    $stmt->execute();
+    app_json(200,['rows'=>$stmt->fetchAll(),'limit'=>$limit,'offset'=>$offset]);
+}
+
+if ($method === 'POST' && preg_match('#^/users/([1-9][0-9]*)/status$#',$path,$matches)) {
+    $userId=(int)$matches[1];
+    if($userId===(int)$admin['id']) app_json(409,['error'=>'برای جلوگیری از قفل‌شدن پنل، امکان غیرفعال‌کردن حساب مدیر فعلی وجود ندارد.']);
+    $body=app_request_json();
+    if(!array_key_exists('active',$body)) app_json(422,['error'=>'وضعیت جدید مشخص نشده است.']);
+    $active=!empty($body['active'])?1:0;
+    $stmt=app_db()->prepare('UPDATE users SET active=? WHERE id=?');
+    $stmt->execute([$active,$userId]);
+    if($stmt->rowCount()>0) {
+        $audit=app_db()->prepare('INSERT INTO admin_audit_log (admin_user_id,action,target_type,target_id,ip_address) VALUES (?,?,?,?,?)');
+        $audit->execute([(int)$admin['id'],$active?'user.enable':'user.disable','user',$userId,substr((string)($_SERVER['REMOTE_ADDR']??'unknown'),0,45)]);
+    }
+    app_json(200,['ok'=>true,'active'=>(bool)$active]);
+}
+
+if ($method === 'GET' && $path === '/questions') {
+    $q=trim((string)($_GET['q']??''));
+    $limit=min(200,max(1,(int)($_GET['limit']??100)));
+    $offset=max(0,min(1000000,(int)($_GET['offset']??0)));
+    $stmt=app_db()->prepare(
+        'SELECT id,question,subject,grade,source_type,created_at FROM questions
+         WHERE (? = "" OR question LIKE ? OR subject LIKE ? OR grade LIKE ?)
+         ORDER BY id DESC LIMIT ? OFFSET ?'
+    );
+    $term='%'.$q.'%';
+    $stmt->bindValue(1,$q);
+    $stmt->bindValue(2,$term);
+    $stmt->bindValue(3,$term);
+    $stmt->bindValue(4,$term);
+    $stmt->bindValue(5,$limit,PDO::PARAM_INT);
+    $stmt->bindValue(6,$offset,PDO::PARAM_INT);
+    $stmt->execute();
+    app_json(200,['rows'=>$stmt->fetchAll(),'limit'=>$limit,'offset'=>$offset]);
+}
+
+if ($method === 'DELETE' && preg_match('#^/questions/([1-9][0-9]*)$#',$path,$matches)) {
+    $questionId=(int)$matches[1];
+    $pdo=app_db();
+    $pdo->beginTransaction();
+    try {
+        $stmt=$pdo->prepare('DELETE FROM questions WHERE id=?');
+        $stmt->execute([$questionId]);
+        if($stmt->rowCount()>0) {
+            $audit=$pdo->prepare('INSERT INTO admin_audit_log (admin_user_id,action,target_type,target_id,ip_address) VALUES (?,?,?,?,?)');
+            $audit->execute([(int)$admin['id'],'question.delete','question',$questionId,substr((string)($_SERVER['REMOTE_ADDR']??'unknown'),0,45)]);
+        }
+        $deleted=$stmt->rowCount();
+        $pdo->commit();
+    } catch(Throwable $e) {
+        if($pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
+    }
+    app_json(200,['deleted'=>$deleted]);
+}
+
 if ($method === 'GET' && $path === '/settings') {
     $row = app_db()->query('SELECT default_model,api_key_ciphertext,updated_at FROM ai_provider_settings WHERE id=1')->fetch() ?: [];
     app_json(200, [
@@ -336,10 +430,14 @@ if ($method === 'POST' && $path === '/generate') {
     $prompt = $type === 'review'
         ? "متن برای بررسی:\n" . mb_substr($text,0,30000) . "\n\nدستور تکمیلی: " . $extra
         : "موضوع: {$topic}\nپایه/مخاطب: {$grade}\nسطح دشواری: {$difficulty}\nتعداد: {$count}\nتوضیحات تکمیلی: {$extra}\n\nخروجی را با تیتر و شماره‌گذاری روشن به زبان فارسی ارائه کن.";
+    $templateSlug=['question'=>'question-fa','practice'=>'practice-fa','review'=>'review-fa'][$type];
+    $templateQuery=app_db()->prepare('SELECT system_prompt FROM ai_prompt_templates WHERE slug=? AND enabled=1 LIMIT 1');
+    $templateQuery->execute([$templateSlug]);
+    $systemPrompt=(string)($templateQuery->fetchColumn()?:$templates[$type]);
     $payload = [
         'model'=>$model,
         'messages'=>[
-            ['role'=>'system','content'=>$templates[$type]],
+            ['role'=>'system','content'=>$systemPrompt],
             ['role'=>'user','content'=>$prompt],
         ],
         'max_tokens'=>min(8192,max(256,(int)($body['max_tokens'] ?? 2048))),
