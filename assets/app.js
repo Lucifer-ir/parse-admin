@@ -22,12 +22,20 @@ function saveApi(value, messageSelector = '#settingsMessage') {
   if (!valueToSave) { $(messageSelector).textContent = 'ابتدا آدرس API را وارد کنید.'; return false; }
   try { const parsed = new URL(valueToSave); if (!['https:', 'http:'].includes(parsed.protocol)) throw new Error(); }
   catch { $(messageSelector).textContent = 'آدرس واردشده معتبر نیست.'; return false; }
+  const apiChanged = apiBase !== '' && apiBase !== valueToSave;
   apiBase = valueToSave;
   localStorage.setItem(API_KEY, apiBase);
+  if (apiChanged && token) {
+    token = '';
+    sessionStorage.removeItem('parse_admin_token');
+    switchToLogin();
+  }
   apiInput.value = apiBase;
   $('#apiSettings').value = apiBase;
   $('#apiOrigin').textContent = new URL(apiBase).host;
-  $(messageSelector).textContent = 'آدرس API ذخیره شد.';
+  $(messageSelector).textContent = apiChanged
+    ? 'آدرس API تغییر کرد؛ برای دسترسی مدیریتی دوباره وارد شوید.'
+    : 'آدرس API ذخیره شد.';
   return true;
 }
 function notify(message) {
@@ -104,9 +112,18 @@ async function refreshDashboard() {
   $('#connection').textContent = 'در حال دریافت اطلاعات...';
   try { await loadDashboard(); notify('اطلاعات پنل به‌روزرسانی شد.'); }
   catch (error) {
-    $('#connection').textContent = error.message; $('#serviceStatus').textContent = 'خطا';
+    $('#connection').textContent = error.message;
+    $('#serviceStatus').textContent = 'خطا';
     if (/دسترسی مدیر|توکن|expired|401|403/i.test(error.message)) {
-      token = ''; sessionStorage.removeItem('parse_admin_token'); switchToLogin();
+      token = '';
+      sessionStorage.removeItem('parse_admin_token');
+      switchToLogin();
+    }
+    if (dashboard.hidden) {
+      switchToLogin();
+      loginError.textContent = error.message;
+    } else {
+      notify(error.message);
     }
   }
 }
@@ -148,7 +165,7 @@ $('#questionsTable').addEventListener('click', async event => {
   catch (error) { notify(error.message); button.disabled = false; }
 });
 document.querySelectorAll('.tab').forEach(button => button.addEventListener('click', () => {
-  document.querySelectorAll('.tab').forEach(tab => tab.classList.toggle('active', tab === button.dataset.tab));
+  document.querySelectorAll('.tab').forEach(tab => tab.classList.toggle('active', tab.dataset.tab === button.dataset.tab));
   ['usersPanel', 'questionsPanel', 'settingsPanel'].forEach(id => { $('#' + id).hidden = id !== button.dataset.tab; });
 }));
 $('#apiOrigin').textContent = apiBase ? new URL(apiBase).host : '';
