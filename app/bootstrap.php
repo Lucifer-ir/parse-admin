@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-$config = require dirname(__DIR__, 2) . '/backend/config.php';
+$config = require dirname(__DIR__) . '/backend/config.php';
 
 ini_set('display_errors', '0');
 ini_set('log_errors', '1');
