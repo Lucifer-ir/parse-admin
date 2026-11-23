@@ -4,6 +4,13 @@ require '/opt/parse-admin/admin/bootstrap.php';
 
 $ip = substr((string)($_SERVER['REMOTE_ADDR'] ?? 'unknown'), 0, 45);
 $flash = '';
+if (!empty($_SESSION['admin']['signed_in_at']) &&
+    (time() - (int)$_SESSION['admin']['signed_in_at'] > 43200 ||
+     time() - (int)($_SESSION['admin']['last_activity'] ?? $_SESSION['admin']['signed_in_at']) > 1800)) {
+    $_SESSION = [];
+    session_regenerate_id(true);
+}
+if (!empty($_SESSION['admin']['id'])) $_SESSION['admin']['last_activity'] = time();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['logout'])) {
     $provided = (string)($_POST['csrf_token'] ?? '');
@@ -69,6 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                             'email' => (string)$user['email'],
                             'role' => 'admin',
                             'signed_in_at' => time(),
+                            'last_activity' => time(),
                         ];
                         $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
                         $pdo->prepare(
@@ -107,8 +115,8 @@ function h(string $value): string { return htmlspecialchars($value, ENT_QUOTES |
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;450;500;550;600;650;700;750;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/admin.css?v=1.0.0">
-<script defer src="/assets/admin.js?v=1.0.0"></script>
+<link rel="stylesheet" href="/assets/admin.css?v=<?= (int)@filemtime('/var/www/parse-admin/assets/admin.css') ?>">
+<script defer src="/assets/admin.js?v=<?= (int)@filemtime('/var/www/parse-admin/assets/admin.js') ?>"></script>
 </head>
 <body class="<?= $loggedIn ? 'app-mode' : 'auth-mode' ?>">
 <?php if (!$loggedIn): ?>
