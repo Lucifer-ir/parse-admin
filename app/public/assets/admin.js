@@ -598,7 +598,13 @@
     $('#batchForm').addEventListener('submit',async event=>{
       event.preventDefault();const data=payloadFromForm($('#batchForm'));const prompts=String(data.requests||'').split(/\n+/).map(x=>x.trim()).filter(Boolean);if(!prompts.length||prompts.length>20)return setMessage('#batchMessage','بین ۱ تا ۲۰ درخواست وارد کنید.','error');
       data.endpoint='/v1/chat/completions';data.requests=prompts.map((prompt,index)=>({custom_id:'parse-'+Date.now()+'-'+(index+1),body:{messages:[{role:'user',content:prompt}],max_tokens:Number(data.max_tokens||256)}}));delete data.max_tokens;setBusy($('#batchForm'),true,'در حال ثبت Batch...');
-      try{const result=await api('/ai/batches',{method:'POST',body:json(data)});$('#batchOutput').textContent=formatObject(result.data);setMessage('#batchMessage','Batch ثبت شد.','success');}
+      try{
+        const result=await api('/ai/batches',{method:'POST',body:json(data)});
+        $('#batchOutput').textContent=formatObject(result.data);
+        const id=result.data?.id||result.data?.batch_id||result.data?.batch?.id||'';
+        if(id) $('#batchLookupId').value=id;
+        setMessage('#batchMessage','Batch ثبت شد. شناسه: '+(id||'در پاسخ Provider موجود نیست'),'success');
+      }
       catch(error){setMessage('#batchMessage',error.message,'error');}
       finally{setBusy($('#batchForm'),false);}
     });
@@ -606,9 +612,61 @@
     $('#imageBatchForm').addEventListener('submit',async event=>{
       event.preventDefault();const data=payloadFromForm($('#imageBatchForm'));const prompts=String(data.prompts||'').split(/\n+/).map(x=>x.trim()).filter(Boolean);if(!prompts.length||prompts.length>10)return setMessage('#imageBatchMessage','بین ۱ تا ۱۰ شرح تصویر وارد کنید.','error');
       data.requests=prompts.map((prompt,index)=>({custom_id:'img-'+Date.now()+'-'+(index+1),type:'generation',body:{prompt}}));setBusy($('#imageBatchForm'),true,'در حال ثبت...');
-      try{const result=await api('/ai/image-batches',{method:'POST',body:json(data)});$('#imageBatchOutput').textContent=formatObject(result.data);setMessage('#imageBatchMessage','Batch تصویر ثبت شد.','success');}
+      try{
+        const result=await api('/ai/image-batches',{method:'POST',body:json(data)});
+        $('#imageBatchOutput').textContent=formatObject(result.data);
+        const id=result.data?.id||result.data?.batch_id||result.data?.batch?.id||'';
+        if(id) $('#imageBatchLookupId').value=id;
+        setMessage('#imageBatchMessage','Batch تصویر ثبت شد. شناسه: '+(id||'در پاسخ Provider موجود نیست'),'success');
+      }
       catch(error){setMessage('#imageBatchMessage',error.message,'error');}
       finally{setBusy($('#imageBatchForm'),false);}
+    });
+
+    $('#checkBatchStatus').addEventListener('click',async()=>{
+      const id=$('#batchLookupId').value.trim();
+      if(!id) return setMessage('#batchMessage','شناسه Batch را وارد کنید.','error');
+      const button=$('#checkBatchStatus');button.disabled=true;button.textContent='در حال بررسی...';
+      try{
+        const result=await api('/ai/batches/'+encodeURIComponent(id));
+        $('#batchOutput').textContent=formatObject(result);
+        setMessage('#batchMessage','وضعیت Batch دریافت شد.','success');
+      } catch(error) {
+        setMessage('#batchMessage',error.message,'error');
+      } finally {
+        button.disabled=false;button.textContent='بررسی وضعیت';
+      }
+    });
+
+    $('#checkImageBatchStatus').addEventListener('click',async()=>{
+      const id=$('#imageBatchLookupId').value.trim();
+      if(!id) return setMessage('#imageBatchMessage','شناسه Batch تصویر را وارد کنید.','error');
+      const button=$('#checkImageBatchStatus');button.disabled=true;button.textContent='در حال بررسی...';
+      try{
+        const result=await api('/ai/image-batches/'+encodeURIComponent(id));
+        $('#imageBatchOutput').textContent=formatObject(result);
+        setMessage('#imageBatchMessage','وضعیت Batch تصویر دریافت شد.','success');
+      } catch(error) {
+        setMessage('#imageBatchMessage',error.message,'error');
+      } finally {
+        button.disabled=false;button.textContent='بررسی وضعیت';
+      }
+    });
+
+    $('#cancelImageBatch').addEventListener('click',async()=>{
+      const id=$('#imageBatchLookupId').value.trim();
+      if(!id) return setMessage('#imageBatchMessage','شناسه Batch تصویر را وارد کنید.','error');
+      if(!confirm('صف این Batch تصویر متوقف شود؟')) return;
+      const button=$('#cancelImageBatch');button.disabled=true;button.textContent='در حال توقف...';
+      try{
+        const result=await api('/ai/image-batches/'+encodeURIComponent(id),{method:'DELETE',body:'{}'});
+        $('#imageBatchOutput').textContent=formatObject(result);
+        setMessage('#imageBatchMessage','درخواست توقف صف ارسال شد.','success');
+      } catch(error) {
+        setMessage('#imageBatchMessage',error.message,'error');
+      } finally {
+        button.disabled=false;button.textContent='توقف صف';
+      }
     });
 
     $('#receiptForm').addEventListener('submit',async event=>{
