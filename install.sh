@@ -56,7 +56,10 @@ fi
 php -l "$INSTALL_DIR/backend/config.php"
 php -l "$INSTALL_DIR/backend/public/index.php"
 php -l "$INSTALL_DIR/backend/bin/create-admin.php"
+find "$INSTALL_DIR/admin" -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+node --check "$INSTALL_DIR/assets/admin.js"
 bash -n "$INSTALL_DIR/install.sh"
+bash -n "$INSTALL_DIR/update-panel.sh"
 bash -n "$INSTALL_DIR/backend/bin/backup-db.sh"
 
 echo "[3/9] Deferring panel deployment until the backend and database are ready..."
@@ -73,6 +76,23 @@ fi
 if [[ -z "$DB_PASS" ]]; then
   DB_PASS="$(openssl rand -hex 32)"
 fi
+APP_ENCRYPTION_KEY=""
+if [[ -f /etc/parse-api.env ]]; then
+  APP_ENCRYPTION_KEY="$(sed -n 's/^APP_ENCRYPTION_KEY=//p' /etc/parse-api.env | head -n1)"
+fi
+if [[ -z "$APP_ENCRYPTION_KEY" ]]; then
+  EXISTING_AI_TABLE="$(mysql "$DB_NAME" -Nse "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='admin_ai_settings'" 2>/dev/null || echo 0)"
+  EXISTING_AI_KEYS=0
+  if [[ "$EXISTING_AI_TABLE" =~ ^[0-9]+$ ]] && (( EXISTING_AI_TABLE > 0 )); then
+    EXISTING_AI_KEYS="$(mysql "$DB_NAME" -Nse "SELECT COUNT(*) FROM admin_ai_settings WHERE api_key_cipher IS NOT NULL AND api_key_cipher <> ''")"
+  fi
+  if [[ "$EXISTING_AI_KEYS" =~ ^[0-9]+$ ]] && (( EXISTING_AI_KEYS > 0 )); then
+    echo "Encrypted AI API keys exist but APP_ENCRYPTION_KEY is missing. Restore its original value from backup; refusing to rotate it." >&2
+    exit 1
+  fi
+  APP_ENCRYPTION_KEY="$(openssl rand -hex 32)"
+fi
+[[ "$APP_ENCRYPTION_KEY" =~ ^[A-Fa-f0-9]{64}$ ]] || { echo "Invalid APP_ENCRYPTION_KEY format." >&2; exit 1; }
 
 mysql <<SQL
 CREATE DATABASE IF NOT EXISTS $DB_NAME CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -96,6 +116,7 @@ DB_NAME=$DB_NAME
 DB_USER=$DB_USER
 DB_PASS=$DB_PASS
 CORS_ORIGIN=https://$PANEL_DOMAIN
+APP_ENCRYPTION_KEY=$APP_ENCRYPTION_KEY
 ENV
 chown root:www-data /etc/parse-api.env
 chmod 0640 /etc/parse-api.env
