@@ -314,6 +314,8 @@
       };
       parseJsonField('tools_json','tools');
       parseJsonField('response_format_json','response_format');
+      parseJsonField('messages_json','messages');
+      parseJsonField('responses_input_json','responses_input');
       parseJsonField('advanced_options_json','advanced');
       if (data.tool_choice) {
         const choice = String(data.tool_choice).trim();
@@ -359,7 +361,7 @@
       setMessage('#chatMessage','در حال ارسال به Responses API...');
       try {
         const result=await api('/ai/responses',{method:'POST',body:json({
-          model:data.model,input:data.message,instructions:data.system,
+          model:data.model,input:data.responses_input || data.message,instructions:data.system,
           max_output_tokens:Number(data.max_tokens||1024),
           save_history:data.save_history,web_search:!!payloadFromForm($('#chatForm')).web_search,
           tools:data.tools,tool_choice:data.tool_choice,response_format:data.response_format,
@@ -427,8 +429,7 @@
               if(chunk.error) { finalError=chunk.error; continue; }
               const delta=chunk.choices?.[0]?.delta?.content;
               if(typeof delta==='string') {
-                $('#chatOutput').textContent+="$"+delta;
-                $('#chatOutput').textContent=$('#chatOutput').textContent.replace(/^\$/,'');
+                $('#chatOutput').textContent += delta;
               }
             } catch { /* Ignore incomplete or non-JSON SSE lines. */ }
           }
