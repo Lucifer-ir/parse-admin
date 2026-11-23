@@ -247,7 +247,7 @@
       $('#modelUsage').innerHTML = models.length ? models.map(model => {
         const total = Math.max(1, ...models.map(x => Number(x.requests || 0)));
         const percent = Math.max(3, Math.round(Number(model.requests || 0) / total * 100));
-        return '<div class="usage-model-row"><div><b>' + escapeHtml(model.model || 'مدل نامشخص') + '</b><span>' + number(model.requests) + ' درخواست · ' + money(model.cost) + ' تومان</span></div><div class="usage-bar"><i style="width:' + percent + '%"></i></div></div>';
+        return '<div class="usage-model-row"><div><b>' + escapeHtml(model.model || 'مدل نامشخص') + '</b><span>' + number(model.requests) + ' درخواست · ' + money(model.cost) + ' تومان</span></div><div class="usage-bar"><i class="usage-bar-fill usage-width-' + percent + '"></i></div></div>';
       }).join('') : '<div class="empty-state compact-empty">هنوز درخواست ثبت نشده است.</div>';
       $('#recentUsage').innerHTML = (data.recent || []).length ? data.recent.map(row => '<tr><td>' + escapeHtml(row.operation) + '</td><td dir="ltr">' + escapeHtml(row.model || '—') + '</td><td><span class="table-status ' + (Number(row.status_code) < 400 ? 'ok' : 'bad') + '">' + number(row.status_code) + '</span></td><td>' + number(row.total_tokens) + '</td><td>' + money(row.charged_toman) + '</td><td>' + escapeHtml(new Date(row.created_at).toLocaleString('fa-IR')) + '</td></tr>').join('') : '<tr><td colspan="6" class="empty-cell">هیچ درخواست هوش مصنوعی از این پنل ثبت نشده است.</td></tr>';
     } catch (error) {
