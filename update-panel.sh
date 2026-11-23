@@ -36,7 +36,7 @@ git -C "$REPO_DIR" reset --hard origin/main
 for required in \
   app/bootstrap.php app/public/index.php app/public/api.php app/public/assets/admin.css app/public/assets/admin.js \
   backend/config.php backend/schema.sql backend/public/index.php backend/platform_routes.php \
-  backend/bin/backup-db.sh backend/migrations/20261123_ai_console.sql backend/migrations/20261123_learning_platform.sql backend/migrations/20261123_tracks_and_activities.sql; do
+  backend/bin/backup-db.sh backend/migrations/20261123_ai_console.sql backend/migrations/20261123_learning_platform.sql backend/migrations/20261123_tracks_and_activities.sql backend/migrations/20261124_language_levels_classes_audio.sql; do
   [[ -s "$REPO_DIR/$required" ]] || { echo "Required application file missing: $required" >&2; exit 1; }
 done
 
@@ -151,7 +151,7 @@ find "$REPO_DIR/app" "$REPO_DIR/backend" -type f -exec chmod 0640 {} \;
 find "$WEB_ROOT" -type d -exec chmod 0750 {} \;
 find "$WEB_ROOT" -type f -exec chmod 0640 {} \;
 # Runtime-owned upload folders only; PHP-FPM cannot modify application source.
-install -d -o www-data -g www-data -m 0750 "$WEB_ROOT/assets/fonts" /var/lib/parse-admin/resources
+install -d -o www-data -g www-data -m 0750 "$WEB_ROOT/assets/fonts" /var/lib/parse-admin/resources /var/lib/parse-admin/student-audio
 
 echo "[7/8] Configuring panel.aiparseh.ir to execute the PHP application..."
 if [[ -s "/etc/letsencrypt/live/$PANEL_DOMAIN/fullchain.pem" && -s "/etc/letsencrypt/live/$PANEL_DOMAIN/privkey.pem" ]]; then
