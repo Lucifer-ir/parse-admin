@@ -49,7 +49,7 @@ function parse_store_event(PDO $pdo, int $studentId, string $event, ?string $rou
 {
     $json = json_encode($metadata, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     $pdo->prepare('UPDATE students SET last_seen_at=UTC_TIMESTAMP(),last_seen_platform=? WHERE id=?')
-        ->execute([substr((string)($metadata['platform'] ?? 'unknown'),0,40),$studentId]);
+        ->execute([substr((string)($metadata['platform'] ?? ($_SERVER['HTTP_X_PARSE_PLATFORM'] ?? 'unknown')),0,40),$studentId]);
     $pdo->prepare(
         'INSERT INTO student_activity_events (student_id,event_type,route,metadata_json,ip_address,platform)
          VALUES (?,?,?,?,?,?)'
@@ -59,7 +59,7 @@ function parse_store_event(PDO $pdo, int $studentId, string $event, ?string $rou
         $route !== null ? substr($route, 0, 190) : null,
         $json ?: null,
         substr((string)($_SERVER['REMOTE_ADDR'] ?? ''), 0, 45),
-        substr((string)($metadata['platform'] ?? 'unknown'), 0, 40),
+        substr((string)($metadata['platform'] ?? ($_SERVER['HTTP_X_PARSE_PLATFORM'] ?? 'unknown')), 0, 40),
     ]);
 }
 
@@ -398,4 +398,37 @@ if ($method === 'POST' && preg_match('#^/exams/([1-9][0-9]*)/submit$#', $path, $
     )->execute([$score, $total, $finalStatus, $attemptId]);
     parse_store_event($pdo, (int)$student['id'], 'exam.submit', '/exams/'.$examId, ['attempt_id' => $attemptId]);
     respond(200, ['submitted' => true, 'status' => $finalStatus, 'score' => $score, 'total_points' => $total, 'pending_manual_review' => $manual]);
+}
+
+
+if ($method === 'GET' && preg_match('#^/resources/([1-9][0-9]*)/download$#', $path, $m)) {
+    $student = parse_require_student($pdo);
+    $resourceId = (int)$m[1];
+    $stmt = $pdo->prepare(
+        'SELECT storage_path,original_filename,published,level,track_id
+         FROM learning_resources WHERE id=? LIMIT 1'
+    );
+    $stmt->execute([$resourceId]);
+    $file = $stmt->fetch();
+    $allowedLevel = !$file || $file['level'] === null || $file['level'] === '' ||
+        (string)$file['level'] === (string)($student['level'] ?? '');
+    $allowedTrack = !$file || $file['track_id'] === null ||
+        (int)$file['track_id'] === (int)($student['track_id'] ?? 0);
+    if (!$file || !(bool)$file['published'] || !$allowedLevel || !$allowedTrack ||
+        !is_string($file['storage_path']) || !str_starts_with($file['storage_path'], '/var/lib/parse-admin/resources/') ||
+        !is_file($file['storage_path'])) {
+        respond(404, ['message' => 'فایل در دسترس نیست.']);
+    }
+    parse_store_event($pdo, (int)$student['id'], 'resource.download', '/resources/'.$resourceId, [
+        'resource_id' => $resourceId,
+        'platform' => $_SERVER['HTTP_X_PARSE_PLATFORM'] ?? 'unknown',
+    ]);
+    $downloadName = basename((string)($file['original_filename'] ?: 'resource'));
+    $downloadName = preg_replace('/[^a-zA-Z0-9._-]/', '_', $downloadName) ?: 'resource';
+    header('Content-Type: application/octet-stream');
+    header('Content-Length: ' . (string)filesize($file['storage_path']));
+    header('Content-Disposition: attachment; filename="' . $downloadName . '"');
+    header('X-Content-Type-Options: nosniff');
+    readfile($file['storage_path']);
+    exit;
 }
