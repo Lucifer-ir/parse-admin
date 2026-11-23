@@ -82,7 +82,6 @@
     if (page === 'usage') loadUsage();
     if (page === 'history') loadHistory();
     if (page === 'settings') { loadSettings(); loadPlatformSettings(); }
-    if (page === 'question-bank') loadQuestionBank();
     if (page === 'users') loadUsers();
     if (page === 'prompts') loadPrompts();
     if (page === 'students') loadStudents();
@@ -1036,8 +1035,6 @@
     $('#refreshMonitoring').addEventListener('click',loadMonitoring);
     $('#studentSearch').addEventListener('input',()=>loadStudents());
     $('#studentStatusFilter').addEventListener('change',loadStudents);
-    $('#refreshQuestionBank').addEventListener('click',loadPlatformQuestionBank);
-    $('#bankQuestionSearch').addEventListener('input',()=>loadPlatformQuestionBank());
   }
 
   function showPrompt(prompt) {
@@ -1169,9 +1166,7 @@
     $('#modelSearch').addEventListener('input',()=>renderCatalog($('#page-models .catalog-tab.active')?.dataset.catalog||'models'));
     $('#loadUsage').addEventListener('click',loadUsage);
     $('#refreshHistory').addEventListener('click',loadHistory);
-    $('#refreshQuestionBank').addEventListener('click',loadQuestionBank);
     $('#refreshUsers').addEventListener('click',loadUsers);
-    $('#bankQuestionSearch').addEventListener('input',()=>loadQuestionBank());
     $('#userSearch').addEventListener('input',()=>loadUsers());
   }
 
