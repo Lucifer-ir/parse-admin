@@ -14,11 +14,53 @@ CREATE TABLE IF NOT EXISTS learning_tracks (
   KEY idx_learning_tracks_active (active,language_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-ALTER TABLE students ADD COLUMN IF NOT EXISTS track_id BIGINT UNSIGNED NULL;
-ALTER TABLE learning_resources ADD COLUMN IF NOT EXISTS track_id BIGINT UNSIGNED NULL;
-ALTER TABLE question_bank ADD COLUMN IF NOT EXISTS track_id BIGINT UNSIGNED NULL;
-ALTER TABLE learning_activities ADD COLUMN IF NOT EXISTS track_id BIGINT UNSIGNED NULL;
-ALTER TABLE exams ADD COLUMN IF NOT EXISTS track_id BIGINT UNSIGNED NULL;
+-- MySQL-compatible, repeatable column additions (the updater replays SQL files).
+SET @parse_schema = DATABASE();
+
+SET @parse_has_col = (
+  SELECT COUNT(*) FROM information_schema.columns
+  WHERE table_schema=@parse_schema AND table_name='students' AND column_name='track_id'
+);
+SET @parse_sql = IF(@parse_has_col=0,
+  'ALTER TABLE students ADD COLUMN track_id BIGINT UNSIGNED NULL',
+  'SELECT 1');
+PREPARE parse_stmt FROM @parse_sql; EXECUTE parse_stmt; DEALLOCATE PREPARE parse_stmt;
+
+SET @parse_has_col = (
+  SELECT COUNT(*) FROM information_schema.columns
+  WHERE table_schema=@parse_schema AND table_name='learning_resources' AND column_name='track_id'
+);
+SET @parse_sql = IF(@parse_has_col=0,
+  'ALTER TABLE learning_resources ADD COLUMN track_id BIGINT UNSIGNED NULL',
+  'SELECT 1');
+PREPARE parse_stmt FROM @parse_sql; EXECUTE parse_stmt; DEALLOCATE PREPARE parse_stmt;
+
+SET @parse_has_col = (
+  SELECT COUNT(*) FROM information_schema.columns
+  WHERE table_schema=@parse_schema AND table_name='question_bank' AND column_name='track_id'
+);
+SET @parse_sql = IF(@parse_has_col=0,
+  'ALTER TABLE question_bank ADD COLUMN track_id BIGINT UNSIGNED NULL',
+  'SELECT 1');
+PREPARE parse_stmt FROM @parse_sql; EXECUTE parse_stmt; DEALLOCATE PREPARE parse_stmt;
+
+SET @parse_has_col = (
+  SELECT COUNT(*) FROM information_schema.columns
+  WHERE table_schema=@parse_schema AND table_name='learning_activities' AND column_name='track_id'
+);
+SET @parse_sql = IF(@parse_has_col=0,
+  'ALTER TABLE learning_activities ADD COLUMN track_id BIGINT UNSIGNED NULL',
+  'SELECT 1');
+PREPARE parse_stmt FROM @parse_sql; EXECUTE parse_stmt; DEALLOCATE PREPARE parse_stmt;
+
+SET @parse_has_col = (
+  SELECT COUNT(*) FROM information_schema.columns
+  WHERE table_schema=@parse_schema AND table_name='exams' AND column_name='track_id'
+);
+SET @parse_sql = IF(@parse_has_col=0,
+  'ALTER TABLE exams ADD COLUMN track_id BIGINT UNSIGNED NULL',
+  'SELECT 1');
+PREPARE parse_stmt FROM @parse_sql; EXECUTE parse_stmt; DEALLOCATE PREPARE parse_stmt;
 
 CREATE TABLE IF NOT EXISTS activity_submissions (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
