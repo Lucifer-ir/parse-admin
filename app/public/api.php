@@ -483,8 +483,7 @@ if ($method === 'POST' && $path === '/platform/students') {
       $stmt=$pdo->prepare('INSERT INTO students(username,student_code,phone,name,email,password_hash,status,level,group_name,track_id) VALUES(?,?,?,?,?,?,?,?,?,?)');
       $stmt->execute([$username,$code!==''?$code:null,$phone!==''?$phone:null,$name,$email!==''?$email:null,$hash,in_array(($body['status']??'active'),['active','disabled','pending'],true)?$body['status']:'active',trim((string)($body['level']??''))?:null,trim((string)($body['group_name']??''))?:null,!empty($body['track_id'])?(int)$body['track_id']:null]);
       $studentId=(int)$pdo->lastInsertId();
-      // Parse mobile login uses users/auth_tokens, so provision that account in the same transaction.
-      $mobile=$pdo->prepare('INSERT INTO users(username,phone,password_hash,name,role) VALUES(?,?,?,?,?)');$mobile->execute([$username,$phone!==''?$phone:null,$hash,$name,'student']);
+      // Student sign-in uses students + student_auth_tokens; users is reserved for admin accounts.
       $pdo->commit();
     }catch(PDOException $e){if($pdo->inTransaction())$pdo->rollBack();if((string)$e->getCode()==='23000')app_json(409,['error'=>'نام کاربری یا شماره تماس/کد دانش‌آموزی در یکی از بخش‌های سامانه تکراری است.']);throw $e;}
     catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
@@ -506,8 +505,6 @@ if ($method === 'POST' && preg_match('#^/platform/students/([1-9][0-9]*)/passwor
     if (strlen($password) < 8) app_json(422, ['error' => 'رمز عبور باید حداقل ۸ کاراکتر باشد.']);
     $pdo=app_db();$hash=password_hash($password,PASSWORD_DEFAULT);
     $stmt=$pdo->prepare('UPDATE students SET password_hash=? WHERE id=?');$stmt->execute([$hash,$id]);
-    $q=$pdo->prepare('SELECT username FROM students WHERE id=?');$q->execute([$id]);$username=(string)$q->fetchColumn();
-    $pdo->prepare('UPDATE users SET password_hash=? WHERE username=? AND role=?')->execute([$hash,$username,'student']);
     if ($stmt->rowCount() < 1) app_json(404, ['error' => 'دانش‌آموز پیدا نشد.']);
     app_db()->prepare('DELETE FROM student_auth_tokens WHERE student_id=?')->execute([$id]);
     app_json(200, ['ok' => true, 'message' => 'رمز دانش‌آموز تغییر کرد و نشست‌های قبلی باطل شدند.']);
