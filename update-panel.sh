@@ -81,7 +81,11 @@ DB_NAME="$(sed -n 's/^DB_NAME=//p' /etc/parse-api.env | head -n1)"
 [[ "$DB_NAME" =~ ^[a-zA-Z0-9_]+$ ]] || { echo "Invalid DB_NAME in /etc/parse-api.env" >&2; exit 1; }
 
 echo "[5/7] Applying additive AI console database migration..."
-mysql "$DB_NAME" < "$REPO_DIR/backend/migrations/20261123_ai_console.sql"
+for migration in "$REPO_DIR"/backend/migrations/*.sql; do
+  [[ -f "$migration" ]] || continue
+  echo "Applying migration: $(basename "$migration")"
+  mysql "$DB_NAME" < "$migration"
+done
 
 echo "[6/7] Setting private PHP file permissions..."
 chown -R root:www-data "$REPO_DIR/app"
