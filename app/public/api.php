@@ -241,6 +241,125 @@ function platform_json_value(mixed $value): ?string
     return json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 }
 
+
+if ($method === 'GET' && $path === '/platform/tracks') {
+    $rows=app_db()->query('SELECT id,language_code,language_name,track_title,course_title,level_code,description,active,created_at FROM learning_tracks ORDER BY language_name,track_title,course_title,level_code')->fetchAll();
+    app_json(200,['rows'=>$rows]);
+}
+
+if ($method === 'POST' && $path === '/platform/tracks') {
+    $body=app_request_json();
+    $languageCode=strtolower(trim((string)($body['language_code']??'')));
+    $languageName=trim((string)($body['language_name']??''));
+    $trackTitle=trim((string)($body['track_title']??''));
+    $courseTitle=trim((string)($body['course_title']??''));
+    $levelCode=trim((string)($body['level_code']??''));
+    if(!preg_match('/^[a-z]{2,16}$/',$languageCode)||$languageName===''||$trackTitle===''||$courseTitle===''||$levelCode==='')app_json(422,['error'=>'زبان، رشته، دوره و سطح را کامل وارد کنید.']);
+    try{
+      $stmt=app_db()->prepare('INSERT INTO learning_tracks(language_code,language_name,track_title,course_title,level_code,description,active) VALUES(?,?,?,?,?,?,1)');
+      $stmt->execute([$languageCode,$languageName,$trackTitle,$courseTitle,$levelCode,trim((string)($body['description']??''))?:null]);
+    }catch(PDOException $e){if((string)$e->getCode()==='23000')app_json(409,['error'=>'این ترکیب زبان، رشته، دوره و سطح قبلاً تعریف شده است.']);throw $e;}
+    app_json(201,['ok'=>true,'id'=>(int)app_db()->lastInsertId()]);
+}
+
+if ($method === 'POST' && preg_match('#^/platform/tracks/([1-9][0-9]*)/status$#',$path,$m)) {
+    $id=(int)$m[1];$body=app_request_json();$active=!empty($body['active'])?1:0;
+    app_db()->prepare('UPDATE learning_tracks SET active=? WHERE id=?')->execute([$active,$id]);
+    app_json(200,['ok'=>true,'active'=>(bool)$active]);
+}
+
+if ($method === 'GET' && $path === '/platform/activities') {
+    $rows=app_db()->query(
+      'SELECT a.id,a.activity_type,a.title,a.subject,a.level,a.due_at,a.status,
+       (SELECT COUNT(*) FROM activity_questions aq WHERE aq.activity_id=a.id) question_count,
+       (SELECT COUNT(*) FROM student_activity_assignments saa WHERE saa.activity_id=a.id) student_count,
+       (SELECT COUNT(*) FROM activity_submissions sub WHERE sub.activity_id=a.id AND sub.status IN (\\'submitted\\',\\'reviewed\\')) submitted_count
+       FROM learning_activities a ORDER BY a.id DESC'
+    )->fetchAll();
+    app_json(200,['rows'=>$rows]);
+}
+
+if ($method === 'POST' && $path === '/platform/activities') {
+    $body=app_request_json();
+    $title=trim((string)($body['title']??''));
+    $questionIds=array_values(array_unique(array_filter(array_map('intval',(array)($body['question_ids']??[])),static fn($id)=>$id>0)));
+    if($title===''||count($questionIds)<1||count($questionIds)>200)app_json(422,['error'=>'عنوان و حداقل یک سؤال منتشرشده از بانک سؤال الزامی است.']);
+    $type=($body['activity_type']??'practice')==='assignment'?'assignment':'practice';
+    $due=trim((string)($body['due_at']??''))?:null;
+    if($due!==null){$due=str_replace('T',' ',$due);if(strlen($due)===16)$due.=':00';}
+    $status=in_array(($body['status']??'draft'),['draft','published','closed'],true)?$body['status']:'draft';
+    $pdo=app_db();$pdo->beginTransaction();
+    try{
+      $pdo->prepare('INSERT INTO learning_activities(activity_type,title,description,subject,level,instructions,due_at,status,created_by) VALUES(?,?,?,?,?,?,?,?,?)')
+       ->execute([$type,$title,trim((string)($body['description']??''))?:null,trim((string)($body['subject']??''))?:null,trim((string)($body['level']??''))?:null,trim((string)($body['instructions']??''))?:null,$due,$status,(int)$admin['id']]);
+      $activityId=(int)$pdo->lastInsertId();
+      $valid=$pdo->prepare('SELECT id FROM question_bank WHERE id=? AND status=\\'published\\'');
+      $link=$pdo->prepare('INSERT INTO activity_questions(activity_id,question_id,position) VALUES(?,?,?)');
+      foreach($questionIds as $index=>$qid){$valid->execute([$qid]);if(!$valid->fetchColumn())throw new InvalidArgumentException('تمام سؤال‌ها باید ابتدا در بانک سؤال منتشر شوند.');$link->execute([$activityId,$qid,$index+1]);}
+      $targetIds=array_values(array_unique(array_filter(array_map('intval',(array)($body['target_student_ids']??[])),static fn($id)=>$id>0)));
+      if(!empty($body['target_student_id']))$targetIds[]=(int)$body['target_student_id'];
+      $targetIds=array_values(array_unique($targetIds));
+      if(!$targetIds){
+        $level=trim((string)($body['level']??''));
+        $query=$level!==''?$pdo->prepare("SELECT id FROM students WHERE status='active' AND level=?"): $pdo->query("SELECT id FROM students WHERE status='active'");
+        if($level!=='')$query->execute([$level]);
+        $targetIds=array_map('intval',$query->fetchAll(PDO::FETCH_COLUMN));
+      }
+      if(count($targetIds)>10000)throw new InvalidArgumentException('تعداد دانش‌آموزان هدف بیش از حد مجاز است.');
+      $assign=$pdo->prepare('INSERT IGNORE INTO student_activity_assignments(activity_id,student_id) VALUES(?,?)');
+      $studentCheck=$pdo->prepare("SELECT id FROM students WHERE id=? AND status='active'");
+      foreach($targetIds as $sid){$studentCheck->execute([$sid]);if($studentCheck->fetchColumn())$assign->execute([$activityId,$sid]);}
+      $pdo->commit();
+    }catch(Throwable $e){
+      if($pdo->inTransaction())$pdo->rollBack();
+      if($e instanceof InvalidArgumentException)app_json(422,['error'=>$e->getMessage()]);
+      throw $e;
+    }
+    app_json(201,['ok'=>true,'id'=>$activityId,'assigned_students'=>count($targetIds)]);
+}
+
+if ($method === 'POST' && preg_match('#^/platform/activities/([1-9][0-9]*)/status$#',$path,$m)) {
+    $id=(int)$m[1];$body=app_request_json();$status=(string)($body['status']??'');
+    if(!in_array($status,['draft','published','closed'],true))app_json(422,['error'=>'وضعیت تمرین معتبر نیست.']);
+    app_db()->prepare('UPDATE learning_activities SET status=? WHERE id=?')->execute([$status,$id]);
+    app_json(200,['ok'=>true]);
+}
+
+if ($method === 'GET' && $path === '/platform/activity-submissions') {
+    $rows=app_db()->query(
+      'SELECT sub.id,sub.activity_id,sub.student_id,sub.submitted_at,sub.score,sub.total_points,sub.status,
+       a.title activity_title,s.name student_name,s.username,
+       (SELECT COUNT(*) FROM activity_answers aa WHERE aa.submission_id=sub.id) answered_count,
+       (SELECT COUNT(*) FROM activity_questions aq WHERE aq.activity_id=sub.activity_id) question_count,
+       (SELECT COUNT(*) FROM activity_answers aa WHERE aa.submission_id=sub.id AND aa.is_correct IS NULL) pending_review
+       FROM activity_submissions sub JOIN learning_activities a ON a.id=sub.activity_id
+       JOIN students s ON s.id=sub.student_id ORDER BY sub.id DESC LIMIT 500'
+    )->fetchAll();
+    app_json(200,['rows'=>$rows]);
+}
+
+if ($method === 'GET' && preg_match('#^/platform/activity-submissions/([1-9][0-9]*)$#',$path,$m)) {
+    $id=(int)$m[1];
+    $head=app_db()->prepare('SELECT sub.*,a.title activity_title,s.name student_name,s.username FROM activity_submissions sub JOIN learning_activities a ON a.id=sub.activity_id JOIN students s ON s.id=sub.student_id WHERE sub.id=?');
+    $head->execute([$id]);$submission=$head->fetch();if(!$submission)app_json(404,['error'=>'پاسخ تمرین پیدا نشد.']);
+    $rows=app_db()->prepare('SELECT aa.id,q.question_text,q.question_type,q.options_json,q.answer_json correct_answer,aa.answer_json student_answer,aa.is_correct,aa.awarded_points,aa.teacher_feedback,aq.points FROM activity_answers aa JOIN question_bank q ON q.id=aa.question_id JOIN activity_questions aq ON aq.question_id=q.id AND aq.activity_id=? WHERE aa.submission_id=? ORDER BY aq.position');
+    $rows->execute([(int)$submission['activity_id'],$id]);
+    app_json(200,['submission'=>$submission,'answers'=>$rows->fetchAll()]);
+}
+
+if ($method === 'POST' && preg_match('#^/platform/activity-answers/([1-9][0-9]*)/grade$#',$path,$m)) {
+    $answerId=(int)$m[1];$body=app_request_json();$points=max(0,(float)($body['awarded_points']??0));$feedback=trim((string)($body['teacher_feedback']??''));
+    $pdo=app_db();$stmt=$pdo->prepare('SELECT submission_id,question_id FROM activity_answers WHERE id=?');$stmt->execute([$answerId]);$answer=$stmt->fetch();if(!$answer)app_json(404,['error'=>'پاسخ سؤال پیدا نشد.']);
+    $maxStmt=$pdo->prepare('SELECT aq.points,aq.activity_id FROM activity_questions aq JOIN activity_submissions sub ON sub.activity_id=aq.activity_id WHERE aq.question_id=? AND sub.id=?');
+    $maxStmt->execute([(int)$answer['question_id'],(int)$answer['submission_id']]);$max=$maxStmt->fetch();
+    if(!$max||$points>(float)$max['points'])app_json(422,['error'=>'نمره از بارم سؤال بیشتر است.']);
+    $pdo->prepare('UPDATE activity_answers SET awarded_points=?,teacher_feedback=? WHERE id=?')->execute([$points,$feedback?:null,$answerId]);
+    $sum=$pdo->prepare('SELECT COALESCE(SUM(awarded_points),0) FROM activity_answers WHERE submission_id=?');$sum->execute([(int)$answer['submission_id']]);$score=(float)$sum->fetchColumn();
+    $total=$pdo->prepare('SELECT COALESCE(SUM(points),0) FROM activity_questions WHERE activity_id=?');$total->execute([(int)$max['activity_id']]);$totalPoints=(float)$total->fetchColumn();
+    $pdo->prepare("UPDATE activity_submissions SET score=?,total_points=?,status='reviewed' WHERE id=?")->execute([$score,$totalPoints,(int)$answer['submission_id']]);
+    app_json(200,['ok'=>true,'score'=>$score,'total_points'=>$totalPoints]);
+}
+
 if ($method === 'GET' && $path === '/platform/settings') {
     $row = app_db()->query('SELECT api_base_url,custom_font_filename,updated_at FROM admin_ui_settings WHERE id=1')->fetch() ?: [];
     app_json(200, [
