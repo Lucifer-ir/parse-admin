@@ -545,7 +545,7 @@
       event.preventDefault();
       const form=$('#imageEditForm');
       const data=payloadFromForm(form);
-      const urls=String(data.image_urls||'').split(/\\r?\\n/).map(value=>value.trim()).filter(Boolean);
+      const urls=String(data.image_urls||'').split(/\r?\n/).map(value=>value.trim()).filter(Boolean);
       setBusy(form,true,'در حال ویرایش...');
       try {
         if(urls.length<1||urls.length>4) throw new Error('بین ۱ تا ۴ نشانی عمومی HTTPS وارد کنید.');
