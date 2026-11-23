@@ -55,6 +55,16 @@ function app_https(): bool
 function app_session_start(): void
 {
     if (session_status() === PHP_SESSION_ACTIVE) return;
+
+    // Never issue or accept the admin session cookie over plain HTTP.
+    $host = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
+    if (!app_https() && in_array($host, ['panel.aiparseh.ir', 'panel.aiparseh.ir:80'], true)) {
+        $uri = (string)($_SERVER['REQUEST_URI'] ?? '/');
+        if ($uri === '' || $uri[0] !== '/') $uri = '/';
+        header('Location: https://panel.aiparseh.ir' . $uri, true, 308);
+        exit;
+    }
+
     ini_set('session.use_strict_mode', '1');
     ini_set('session.use_only_cookies', '1');
     ini_set('session.cookie_httponly', '1');
