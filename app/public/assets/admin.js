@@ -809,7 +809,8 @@
       const classTypes=(catalog.class_types||[]);
       const activeTypes=classTypes.filter(type=>Number(type.active));
       const activeLanguages=(catalog.languages||[]);
-      const activeLevels=(catalog.levels||[]);
+      const allLevels=(catalog.levels||[]);
+      const activeLevels=allLevels.filter(level=>Number(level.active));
       if ($('#trackRows')) {
         $('#trackRows').innerHTML = state.tracks.length ? state.tracks.map(track =>
           '<tr><td>'+escapeHtml(track.language_name)+' <small dir="ltr">'+escapeHtml(track.language_code)+'</small></td><td>'+escapeHtml(track.track_title)+'</td><td>'+escapeHtml(track.course_title)+'</td><td>'+escapeHtml(track.level_code)+'</td><td>'+escapeHtml(track.class_type_title||'—')+'</td><td><span class="table-status '+(Number(track.active)?'ok':'bad')+'">'+(Number(track.active)?'فعال':'غیرفعال')+'</span></td><td><button class="button button-secondary" data-track-status="'+Number(track.id)+'" data-active="'+Number(track.active)+'">'+(Number(track.active)?'غیرفعال‌سازی':'فعال‌سازی')+'</button></td></tr>'
@@ -820,6 +821,8 @@
         $('#trackLanguage').innerHTML=activeLanguages.map(l=>'<option value="'+escapeHtml(l.language_code)+'">'+escapeHtml(l.native_name||l.language_name)+'</option>').join('');
         $('#trackLanguage').value=activeLanguages.some(l=>l.language_code===selected)?selected:(activeLanguages[0]?.language_code||'en');
       }
+      const languageOptions=activeLanguages.map(l=>'<option value="'+escapeHtml(l.language_code)+'">'+escapeHtml(l.native_name||l.language_name)+'</option>').join('');
+      if($('#levelLanguage')){const previous=$('#levelLanguage').value||($('#trackLanguage')?.value||'en');$('#levelLanguage').innerHTML=languageOptions;$('#levelLanguage').value=activeLanguages.some(l=>l.language_code===previous)?previous:(activeLanguages[0]?.language_code||'en');}
       const refreshTrackLevels=()=>{
         if(!$('#trackLevel'))return;
         const lang=$('#trackLanguage')?.value||'en', current=$('#trackLevel').value;
@@ -843,6 +846,10 @@
         if(select){const previous=select.value;select.innerHTML=(selector==='#studentEditForm [name="track_id"]'?'<option value="">بدون مسیر آموزشی</option>':'<option value="">بدون محدودیت مسیر</option>')+routeOptions.replace('<option value="">بدون محدودیت مسیر</option>','');if(previous)select.value=previous;}
       });
       if($('#classTypeRows'))$('#classTypeRows').innerHTML=classTypes.length?classTypes.map(type=>'<tr><td>'+escapeHtml(type.title)+'</td><td dir="ltr">'+escapeHtml(type.code)+'</td><td><span class="table-status '+(Number(type.active)?'ok':'bad')+'">'+(Number(type.active)?'فعال':'غیرفعال')+'</span></td><td><button class="button button-secondary" data-class-type-status="'+Number(type.id)+'" data-active="'+Number(type.active)+'">'+(Number(type.active)?'غیرفعال‌سازی':'فعال‌سازی')+'</button></td></tr>').join(''):'<tr><td colspan="4" class="empty-cell">هنوز نوع کلاسی تعریف نشده است.</td></tr>';
+      if($('#levelRows'))$('#levelRows').innerHTML=allLevels.length?allLevels.map(level=>{
+        const language=activeLanguages.find(item=>item.language_code===level.language_code);
+        return '<tr><td>'+escapeHtml(language?.native_name||language?.language_name||level.language_code)+'</td><td dir="ltr">'+escapeHtml(level.level_code)+'</td><td>'+escapeHtml(level.level_name)+'</td><td><span class="table-status '+(Number(level.active)?'ok':'bad')+'">'+(Number(level.active)?'فعال':'غیرفعال')+'</span></td><td><button class="button button-secondary" data-level-status="'+Number(level.id)+'" data-active="'+Number(level.active)+'">'+(Number(level.active)?'غیرفعال‌سازی':'فعال‌سازی')+'</button></td></tr>';
+      }).join(''):'<tr><td colspan="5" class="empty-cell">هنوز سطحی تعریف نشده است.</td></tr>';
     } catch(error) {
       if($('#trackRows'))$('#trackRows').innerHTML='<tr><td colspan="7" class="empty-cell">'+escapeHtml(error.message)+'</td></tr>';
       toast(error.message,'error');
@@ -1101,6 +1108,22 @@
       finally{setBusy(form,false);}
     });
 
+    $('#levelCreateForm').addEventListener('submit',async event=>{
+      event.preventDefault();const form=event.currentTarget;const data=payloadFromForm(form);
+      data.language_code=String(data.language_code||'').toLowerCase();
+      data.level_code=String(data.level_code||'').trim().toUpperCase();
+      data.level_order=Number(data.level_order||100);
+      setBusy(form,true,'در حال افزودن سطح آموزشی...');
+      try{
+        await api('/platform/levels',{method:'POST',body:json(data)});
+        form.reset();
+        if($('#levelLanguage'))$('#levelLanguage').value=data.language_code;
+        setMessage('#levelMessage','سطح آموزشی به فهرست اضافه شد.','success');
+        await loadTracks();
+      }catch(error){setMessage('#levelMessage',error.message,'error');}
+      finally{setBusy(form,false);}
+    });
+
     $('#activityCreateForm').addEventListener('submit',async event=>{
       event.preventDefault();const form=event.currentTarget;const data=payloadFromForm(form);
       data.question_ids=String(data.question_ids||'').split(',').map(value=>Number(value.trim())).filter(value=>Number.isSafeInteger(value)&&value>0);
@@ -1213,6 +1236,13 @@
       const button=event.target.closest('[data-class-type-status]');if(!button)return;
       try{
         await api('/platform/class-types/'+Number(button.dataset.classTypeStatus)+'/status',{method:'POST',body:json({active:button.dataset.active!=='1'})});
+        await loadTracks();
+      }catch(error){toast(error.message,'error');}
+    });
+    $('#levelRows').addEventListener('click',async event=>{
+      const button=event.target.closest('[data-level-status]');if(!button)return;
+      try{
+        await api('/platform/levels/'+Number(button.dataset.levelStatus)+'/status',{method:'POST',body:json({active:button.dataset.active!=='1'})});
         await loadTracks();
       }catch(error){toast(error.message,'error');}
     });
