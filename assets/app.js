@@ -44,7 +44,8 @@
   function setApiBase(value) {
     apiBase = validateApiUrl(value);
     localStorage.setItem(API_KEY, apiBase);
-    $('#apiSettings').value = apiBase;
+    if ($('#apiSettings')) $('#apiSettings').value = apiBase;
+    if ($('#loginApi')) $('#loginApi').value = apiBase;
     $('#apiOrigin').textContent = new URL(apiBase).host;
   }
 
@@ -237,6 +238,33 @@
     }
   }
 
+  // Configure and test API connection before submitting credentials.
+  $('#saveLoginApi')?.addEventListener('click', () => {
+    const message = $('#loginApiMessage');
+    try {
+      setApiBase($('#loginApi').value);
+      message.textContent = 'آدرس API ذخیره شد.';
+      setLoginError('');
+    } catch (error) {
+      message.textContent = error.message;
+    }
+  });
+
+  $('#testLoginApi')?.addEventListener('click', async () => {
+    const message = $('#loginApiMessage');
+    message.textContent = 'در حال بررسی اتصال...';
+    try {
+      const candidate = validateApiUrl($('#loginApi').value || apiBase);
+      const health = await checkHealth(candidate);
+      setApiBase(candidate);
+      message.textContent = 'اتصال موفق · ' + (health.service || 'API') + ' · ' + (health.version || '');
+      setLoginError('');
+    } catch (error) {
+      message.textContent = 'خطای اتصال: ' + error.message;
+      setLoginError(error.message);
+    }
+  });
+
   loginForm.addEventListener('submit', async event => {
     event.preventDefault();
     setLoginError('');
@@ -253,6 +281,7 @@
     const originalLabel = 'ورود به پنل';
     submit.disabled = true;
     submit.textContent = 'در حال بررسی اطلاعات...';
+    setLoginError('در حال اتصال به API و بررسی حساب...');
 
     try {
       try {
@@ -391,6 +420,7 @@
   });
 
   $('#apiSettings').value = apiBase;
+  if ($('#loginApi')) $('#loginApi').value = apiBase;
   $('#apiOrigin').textContent = new URL(apiBase).host;
 
   if (token) {
