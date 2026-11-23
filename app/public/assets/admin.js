@@ -306,15 +306,43 @@
       } catch(error) { toast(error.message,'error'); }
     });
 
+    function parseAdvancedOptions(data) {
+      const parseJsonField = (field, target) => {
+        const raw = String(data[field] || '').trim();
+        delete data[field];
+        if (raw) data[target] = JSON.parse(raw);
+      };
+      parseJsonField('tools_json','tools');
+      parseJsonField('response_format_json','response_format');
+      parseJsonField('advanced_options_json','advanced');
+      if (data.tool_choice) {
+        const choice = String(data.tool_choice).trim();
+        try { data.tool_choice = JSON.parse(choice); } catch { data.tool_choice = choice; }
+      } else {
+        delete data.tool_choice;
+      }
+      delete data.web_search;
+      if (data.advanced && typeof data.advanced === 'object') {
+        for (const [key,value] of Object.entries(data.advanced)) {
+          if (!Object.prototype.hasOwnProperty.call(data,key)) data[key]=value;
+        }
+        delete data.advanced;
+      }
+      return data;
+    }
+
     $('#chatForm').addEventListener('submit', async event => {
       event.preventDefault();
-      const form=$('#chatForm'); const data=payloadFromForm(form);
+      const form=$('#chatForm');
+      let data;
+      try { data=parseAdvancedOptions(payloadFromForm(form)); }
+      catch { return setMessage('#chatMessage','ساختار JSON در تنظیمات پیشرفته معتبر نیست.','error'); }
       setBusy(form,true,'در حال دریافت پاسخ...');
-      setMessage('#chatMessage','درخواست در حال پردازش است...');
+      setMessage('#chatMessage','درخواست از بک‌اند PHP به درگاه هوش مصنوعی ارسال شد...');
       $('#chatState').textContent='در حال اجرا';
       try {
         const result=await api('/ai/chat',{method:'POST',body:json(data)});
-        displayText('#chatOutput',result.output);
+        displayText('#chatOutput',result.output || formatObject(result.data));
         renderUsageDetails('#chatUsage',result);
         $('#chatState').textContent='تکمیل شد';
         setMessage('#chatMessage','پاسخ دریافت شد.','success');
@@ -323,16 +351,95 @@
     });
 
     $('#runResponses').addEventListener('click',async()=>{
-      const data=payloadFromForm($('#chatForm'));
+      let data;
+      try { data=parseAdvancedOptions(payloadFromForm($('#chatForm'))); }
+      catch { return setMessage('#chatMessage','ساختار JSON در تنظیمات پیشرفته معتبر نیست.','error'); }
       if(!data.model||!data.message) return toast('مدل و پیام را وارد کنید.','error');
       $('#chatState').textContent='Responses API';
       setMessage('#chatMessage','در حال ارسال به Responses API...');
       try {
-        const result=await api('/ai/responses',{method:'POST',body:json({model:data.model,input:data.message,instructions:data.system,max_output_tokens:Number(data.max_tokens||1024),save_history:data.save_history})});
+        const result=await api('/ai/responses',{method:'POST',body:json({
+          model:data.model,input:data.message,instructions:data.system,
+          max_output_tokens:Number(data.max_tokens||1024),
+          save_history:data.save_history,web_search:!!payloadFromForm($('#chatForm')).web_search,
+          tools:data.tools,tool_choice:data.tool_choice,response_format:data.response_format,
+          pdf_processing:data.pdf_processing,structured_outputs:data.structured_outputs,
+          max_tool_calls:data.max_tool_calls
+        })});
         displayText('#chatOutput',result.output||formatObject(result.data));
         $('#chatUsage').textContent='شناسه درخواست: '+(result.request_id||'—');
         setMessage('#chatMessage','درخواست Responses با موفقیت انجام شد.','success');
       } catch(error) { setMessage('#chatMessage',error.message,'error'); }
+    });
+
+    $('#runMessages').addEventListener('click',async()=>{
+      const data=payloadFromForm($('#chatForm'));
+      if(!data.model||!data.message) return toast('مدل و پیام را وارد کنید.','error');
+      $('#chatState').textContent='Anthropic Messages';
+      setMessage('#chatMessage','در حال ارسال به مسیر Anthropic Messages...');
+      try {
+        const result=await api('/ai/messages',{method:'POST',body:json({model:data.model,message:data.message,system:data.system,max_tokens:Number(data.max_tokens||1024)})});
+        displayText('#chatOutput',result.output||formatObject(result.data));
+        $('#chatUsage').textContent='شناسه درخواست: '+(result.request_id||'—');
+        setMessage('#chatMessage','درخواست Messages با موفقیت انجام شد.','success');
+      } catch(error) { setMessage('#chatMessage',error.message,'error'); }
+    });
+
+    $('#runStream').addEventListener('click',async()=>{
+      const form=$('#chatForm');
+      let data;
+      try { data=parseAdvancedOptions(payloadFromForm(form)); }
+      catch { return setMessage('#chatMessage','ساختار JSON در تنظیمات پیشرفته معتبر نیست.','error'); }
+      if(!data.model||!data.message) return toast('مدل و پیام را وارد کنید.','error');
+      $('#chatState').textContent='جریان زنده';
+      $('#chatOutput').textContent='';
+      setMessage('#chatMessage','در حال دریافت خروجی جریانی SSE...');
+      const controller=new AbortController();
+      try {
+        const response=await fetch('/api/ai/chat/stream',{
+          method:'POST',
+          credentials:'same-origin',
+          headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},
+          body:json(data),
+          signal:controller.signal
+        });
+        if(!response.ok || !response.body) {
+          const err=await response.json().catch(()=>({}));
+          throw new Error(err.error||'خطای HTTP '+response.status);
+        }
+        const reader=response.body.getReader();
+        const decoder=new TextDecoder();
+        let buffer='';
+        let finalError='';
+        while(true) {
+          const {value,done}=await reader.read();
+          if(done) break;
+          buffer+=decoder.decode(value,{stream:true});
+          const lines=buffer.split(/\r?\n/);
+          buffer=lines.pop()||'';
+          for(const line of lines) {
+            if(line.startsWith('event: error')) continue;
+            if(!line.startsWith('data:')) continue;
+            const raw=line.slice(5).trim();
+            if(!raw||raw==='[DONE]') continue;
+            try {
+              const chunk=JSON.parse(raw);
+              if(chunk.error) { finalError=chunk.error; continue; }
+              const delta=chunk.choices?.[0]?.delta?.content;
+              if(typeof delta==='string') {
+                $('#chatOutput').textContent+="$"+delta;
+                $('#chatOutput').textContent=$('#chatOutput').textContent.replace(/^\$/,'');
+              }
+            } catch { /* Ignore incomplete or non-JSON SSE lines. */ }
+          }
+        }
+        if(finalError) throw new Error(finalError);
+        $('#chatState').textContent='تکمیل شد';
+        setMessage('#chatMessage','جریان پاسخ به پایان رسید. جزئیات مصرف در گزارش ثبت شد.','success');
+      } catch(error) {
+        $('#chatState').textContent='خطا';
+        setMessage('#chatMessage',error.message,'error');
+      }
     });
 
     $('#imageForm').addEventListener('submit',async event=>{
