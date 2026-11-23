@@ -19,7 +19,7 @@ if (!is_array($config)) {
     http_response_code(503);
     exit;
 }
-foreach (['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASS', 'CORS_ORIGIN'] as $required) {
+foreach (['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASS', 'CORS_ORIGIN', 'APP_ENCRYPTION_KEY'] as $required) {
     if (!isset($config[$required]) || $config[$required] === '') {
         error_log('Parse API configuration is incomplete: ' . $required);
         http_response_code(503);
