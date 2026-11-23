@@ -806,7 +806,8 @@
       const [trackResult,catalog] = await Promise.all([api('/platform/tracks'),api('/platform/education-catalog')]);
       state.tracks = trackResult.rows || [];
       state.educationCatalog = catalog;
-      const activeTypes=(catalog.class_types||[]);
+      const classTypes=(catalog.class_types||[]);
+      const activeTypes=classTypes.filter(type=>Number(type.active));
       const activeLanguages=(catalog.languages||[]);
       const activeLevels=(catalog.levels||[]);
       if ($('#trackRows')) {
@@ -841,7 +842,7 @@
         const select=$(selector);
         if(select){const previous=select.value;select.innerHTML=(selector==='#studentEditForm [name="track_id"]'?'<option value="">بدون مسیر آموزشی</option>':'<option value="">بدون محدودیت مسیر</option>')+routeOptions.replace('<option value="">بدون محدودیت مسیر</option>','');if(previous)select.value=previous;}
       });
-      if($('#classTypeRows'))$('#classTypeRows').innerHTML=activeTypes.length?activeTypes.map(type=>'<tr><td>'+escapeHtml(type.title)+'</td><td dir="ltr">'+escapeHtml(type.code)+'</td><td><span class="table-status ok">فعال</span></td><td><button class="button button-secondary" data-class-type-status="'+Number(type.id)+'">غیرفعال‌سازی</button></td></tr>').join(''):'<tr><td colspan="4" class="empty-cell">هنوز نوع کلاسی تعریف نشده است.</td></tr>';
+      if($('#classTypeRows'))$('#classTypeRows').innerHTML=classTypes.length?classTypes.map(type=>'<tr><td>'+escapeHtml(type.title)+'</td><td dir="ltr">'+escapeHtml(type.code)+'</td><td><span class="table-status '+(Number(type.active)?'ok':'bad')+'">'+(Number(type.active)?'فعال':'غیرفعال')+'</span></td><td><button class="button button-secondary" data-class-type-status="'+Number(type.id)+'" data-active="'+Number(type.active)+'">'+(Number(type.active)?'غیرفعال‌سازی':'فعال‌سازی')+'</button></td></tr>').join(''):'<tr><td colspan="4" class="empty-cell">هنوز نوع کلاسی تعریف نشده است.</td></tr>';
     } catch(error) {
       if($('#trackRows'))$('#trackRows').innerHTML='<tr><td colspan="7" class="empty-cell">'+escapeHtml(error.message)+'</td></tr>';
       toast(error.message,'error');
@@ -1019,6 +1020,26 @@
       finally { setBusy(form,false); }
     });
 
+    $('#studentEditForm').addEventListener('submit',async event=>{
+      event.preventDefault();
+      const form=event.currentTarget;
+      const data=payloadFromForm(form);
+      const id=Number(data.student_id);
+      delete data.student_id;
+      if(!id)return setMessage('#studentEditMessage','شناسه دانش‌آموز معتبر نیست.','error');
+      data.track_id=data.track_id?Number(data.track_id):null;
+      setBusy(form,true,'در حال ذخیره تغییرات...');
+      try{
+        await api('/platform/students/'+id,{method:'POST',body:json(data)});
+        $('#studentEditDialog').close();
+        await loadStudents();
+        toast('اطلاعات و مسیر آموزشی دانش‌آموز به‌روزرسانی شد.','success');
+      }catch(error){setMessage('#studentEditMessage',error.message,'error');}
+      finally{setBusy(form,false);}
+    });
+    $('#cancelStudentEdit').addEventListener('click',()=>$('#studentEditDialog').close());
+
+
     $('#resourceCreateForm').addEventListener('submit',async event=>{
       event.preventDefault(); const form=event.currentTarget; const file=form.elements.resource_file.files[0];
       setBusy(form,true,'در حال ذخیره منبع...');
@@ -1064,6 +1085,19 @@
       setBusy(form,true,'در حال ذخیره مسیر آموزشی...');
       try{const result=await api('/platform/tracks',{method:'POST',body:json(data)});form.reset();setMessage('#trackCreateMessage','مسیر آموزشی ذخیره شد. شناسه: '+number(result.id),'success');await loadTracks();}
       catch(error){setMessage('#trackCreateMessage',error.message,'error');}
+      finally{setBusy(form,false);}
+    });
+
+    $('#classTypeCreateForm').addEventListener('submit',async event=>{
+      event.preventDefault();const form=event.currentTarget;const data=payloadFromForm(form);
+      data.code=String(data.code||'').trim().toLowerCase();
+      setBusy(form,true,'در حال افزودن نوع کلاس...');
+      try{
+        await api('/platform/class-types',{method:'POST',body:json(data)});
+        form.reset();
+        setMessage('#classTypeMessage','نوع کلاس به فهرست اضافه شد.','success');
+        await loadTracks();
+      }catch(error){setMessage('#classTypeMessage',error.message,'error');}
       finally{setBusy(form,false);}
     });
 
@@ -1119,12 +1153,19 @@
       if(editButton){
         const id=Number(editButton.dataset.studentEdit), row=state.students.find(item=>Number(item.id)===id);
         if(!row)return;
-        const name=prompt('نام و نام خانوادگی:',row.name||'');if(name===null)return;
-        const level=prompt('سطح آموزشی:',row.level||'');if(level===null)return;
-        const group_name=prompt('کلاس / گروه:',row.group_name||'');if(group_name===null)return;
-        const phone=prompt('شماره تماس:',row.phone||'');if(phone===null)return;
-        try{await api('/platform/students/'+id,{method:'POST',body:json({name,level,group_name,phone})});await loadStudents();toast('اطلاعات دانش‌آموز به‌روزرسانی شد.','success');}
-        catch(error){toast(error.message,'error');}
+        const form=$('#studentEditForm'),dialog=$('#studentEditDialog');
+        if(!form||!dialog)return;
+        await loadTracks();
+        form.elements.student_id.value=String(id);
+        form.elements.name.value=row.name||'';
+        form.elements.phone.value=row.phone||'';
+        form.elements.email.value=row.email||'';
+        form.elements.student_code.value=row.student_code||'';
+        form.elements.group_name.value=row.group_name||'';
+        form.elements.track_id.value=row.track_id?String(row.track_id):'';
+        $('#studentEditMeta').textContent=(row.language_name||'')+' · '+(row.course_title||'')+' · '+(row.track_level||row.level||'بدون سطح');
+        setMessage('#studentEditMessage','');
+        if(typeof dialog.showModal==='function')dialog.showModal();else dialog.setAttribute('open','');
         return;
       }
       if(passwordButton){
@@ -1167,6 +1208,13 @@
       const button=event.target.closest('[data-track-status]');if(!button)return;
       try{await api('/platform/tracks/'+Number(button.dataset.trackStatus)+'/status',{method:'POST',body:json({active:button.dataset.active!=='1'})});await loadTracks();}
       catch(error){toast(error.message,'error');}
+    });
+    $('#classTypeRows').addEventListener('click',async event=>{
+      const button=event.target.closest('[data-class-type-status]');if(!button)return;
+      try{
+        await api('/platform/class-types/'+Number(button.dataset.classTypeStatus)+'/status',{method:'POST',body:json({active:button.dataset.active!=='1'})});
+        await loadTracks();
+      }catch(error){toast(error.message,'error');}
     });
     $('#activityRows').addEventListener('click',async event=>{
       const button=event.target.closest('[data-activity-status]');if(!button)return;
