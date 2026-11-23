@@ -149,6 +149,8 @@ find "$REPO_DIR/app" "$REPO_DIR/backend" -type f -exec chmod 0640 {} \;
 # Keep the panel and its static assets readable by the Nginx/PHP-FPM group.
 find "$WEB_ROOT" -type d -exec chmod 0750 {} \;
 find "$WEB_ROOT" -type f -exec chmod 0640 {} \;
+# Runtime-owned upload folders only; PHP-FPM cannot modify application source.
+install -d -o www-data -g www-data -m 0750 "$WEB_ROOT/assets/fonts" /var/lib/parse-admin/resources
 
 echo "[7/8] Configuring panel.aiparseh.ir to execute the PHP application..."
 if [[ -s "/etc/letsencrypt/live/$PANEL_DOMAIN/fullchain.pem" && -s "/etc/letsencrypt/live/$PANEL_DOMAIN/privkey.pem" ]]; then
