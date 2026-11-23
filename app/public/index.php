@@ -96,7 +96,7 @@ $assetVersion = max(
 <meta name="csrf-token" content="<?= app_e($csrf) ?>">
 <title><?= $admin ? 'کنسول مدیریت Parse' : 'ورود مدیر | Parse Admin' ?></title>
 <link rel="stylesheet" href="/assets/admin.css?v=<?= app_e((string)$assetVersion) ?>">
-<?php if (is_file(__DIR__ . '/assets/custom-font.css')): ?><link rel="stylesheet" href="/assets/custom-font.css?v=<?= (int)filemtime(__DIR__ . '/assets/custom-font.css') ?>"><?php endif; ?>
+<?php if (is_file(__DIR__ . '/assets/fonts/custom-font.css')): ?><link rel="stylesheet" href="/assets/fonts/custom-font.css?v=<?= (int)filemtime(__DIR__ . '/assets/fonts/custom-font.css') ?>"><?php endif; ?>
 </head>
 <body class="<?= $admin ? 'app-page' : 'login-page' ?>">
 <?php if (!$admin): ?>
