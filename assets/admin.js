@@ -327,8 +327,33 @@
     }
   }
 
+  function extractSseText(raw) {
+    const lines = String(raw || '').split(/\\r?\\n/);
+    const pieces = [];
+    let structured = [];
+    for (const line of lines) {
+      if (!line.startsWith('data:')) continue;
+      const chunk = line.slice(5).trim();
+      if (!chunk || chunk === '[DONE]') continue;
+      try {
+        const item = JSON.parse(chunk);
+        const chatDelta = item.choices?.[0]?.delta?.content;
+        if (typeof chatDelta === 'string') pieces.push(chatDelta);
+        else if (Array.isArray(chatDelta)) pieces.push(chatDelta.map(part => part.text || '').join(''));
+        else if (item.type === 'response.output_text.delta' && typeof item.delta === 'string') pieces.push(item.delta);
+        else if (item.type === 'content_block_delta' && item.delta?.type === 'text_delta') pieces.push(item.delta.text || '');
+        else if (item.choices?.[0]?.text) pieces.push(item.choices[0].text);
+        else if (item.error) structured.push(item.error.message || JSON.stringify(item.error));
+      } catch {
+        // Ignore non-JSON keep-alive/event lines.
+      }
+    }
+    return pieces.length ? pieces.join('') : (structured.join('\\n') || String(raw || ''));
+  }
+
   function extractText(data, apiKind = 'chat') {
     if (!data || typeof data !== 'object') return String(data ?? '');
+    if (typeof data.raw === 'string' && data.raw.includes('data:')) return extractSseText(data.raw);
     if (typeof data.output_text === 'string') return data.output_text;
     if (apiKind === 'messages' && Array.isArray(data.content)) {
       return data.content.map(part => part.text || '').filter(Boolean).join('\n');
@@ -492,14 +517,36 @@
       const system = $('#playgroundSystem').value.trim();
       let operation = 'chat';
       let payload;
+      const stream = $('#playgroundStream').checked;
+      const webSearch = $('#playgroundWebSearch').checked;
+      if (webSearch && apiType !== 'responses') throw new Error('جست‌وجوی وب طبق مستندات فقط از Responses API اجرا می‌شود.');
+      if (stream && apiType === 'messages') throw new Error('در این پنل استریم برای Chat Completions و Responses فعال است.');
+      let tools = null;
+      let responseFormat = null;
+      if ($('#playgroundTools').value.trim()) {
+        try { tools = JSON.parse($('#playgroundTools').value); } catch { throw new Error('Function Tools JSON معتبر نیست.'); }
+        if (!Array.isArray(tools) || tools.length > 128) throw new Error('tools باید آرایه‌ای با حداکثر ۱۲۸ تابع باشد.');
+      }
+      if ($('#playgroundStructured').value.trim()) {
+        try { responseFormat = JSON.parse($('#playgroundStructured').value); } catch { throw new Error('Structured Output JSON معتبر نیست.'); }
+      }
       if (apiType === 'responses') {
         operation = 'responses';
-        payload = { model, instructions: system, input: text, max_output_tokens: max, store: false, stream: false };
+        payload = { model, instructions: system, input: text, max_output_tokens: max, store: false, stream };
+        if (webSearch) {
+          payload.tools = [{ type: 'web_search' }];
+          payload.tool_choice = { type: 'web_search' };
+          payload.max_tool_calls = 1;
+        }
+        if (tools) payload.tools = [...(payload.tools || []), ...tools];
       } else if (apiType === 'messages') {
         operation = 'messages';
         payload = { model, max_tokens: max, system, messages: [{ role: 'user', content: text }] };
+        if (tools) payload.tools = tools;
       } else {
-        payload = { model, messages: [...(system ? [{ role:'system', content:system }] : []), { role:'user', content:text }], max_tokens: max, temperature: Math.min(2, Math.max(0, Number($('#playgroundTemp').value || 0.7))) };
+        payload = { model, messages: [...(system ? [{ role:'system', content:system }] : []), { role:'user', content:text }], max_tokens: max, temperature: Math.min(2, Math.max(0, Number($('#playgroundTemp').value || 0.7))), stream };
+        if (tools) payload.tools = tools;
+        if (responseFormat) payload.response_format = responseFormat;
       }
       const result = await invoke(operation, payload);
       const answer = extractText(result.data, apiType);
@@ -747,7 +794,8 @@
   }
 
   function exportJson(id) {
-    const data = state.lastOutputs[id.replace('Result','')] || null;
+    const keys = { questionResult: 'questions', exerciseResult: 'exercises', reviewResult: 'review' };
+    const data = state.lastOutputs[keys[id] || id.replace('Result','')] || null;
     if (!data) { toast('خروجی‌ای برای دانلود وجود ندارد.', 'error'); return; }
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -759,7 +807,7 @@
     $$(buttonSelector).forEach(button => button.addEventListener('click', () => {
       $$(buttonSelector).forEach(x => x.classList.toggle('selected', x === button));
       const selected = button.dataset[dataAttr];
-      $$(panelSelector).forEach(panel => { panel.hidden = panel.id !== panelPrefix + selected; });
+      $(panelSelector).forEach(panel => { panel.hidden = panel.id !== panelPrefix + selected + 'Panel'; });
     }));
   }
 
