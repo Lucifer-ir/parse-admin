@@ -17,7 +17,7 @@ $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 if ($origin !== '' && hash_equals((string)$config['CORS_ORIGIN'], $origin)) {
     header('Access-Control-Allow-Origin: ' . $origin);
     header('Vary: Origin');
-    header('Access-Control-Allow-Headers: Authorization, Content-Type');
+    header('Access-Control-Allow-Headers: Authorization, Content-Type, X-Parse-Platform');
     header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
     header('Access-Control-Max-Age: 600');
 }
