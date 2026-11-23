@@ -442,6 +442,9 @@ if ($method === 'POST' && $path === '/ai/chat') {
     $messages[]=['role'=>'user','content'=>mb_substr($message,0,50000)];
     $payload=['model'=>$model,'messages'=>$messages,'max_tokens'=>min(8192,max(64,(int)($body['max_tokens']??1024))),'stream'=>false];
     if(isset($body['temperature'])) $payload['temperature']=max(0,min(2,(float)$body['temperature']));
+    foreach(['tools','tool_choice','response_format','parallel_tool_calls','top_p','presence_penalty','frequency_penalty','seed','stop'] as $field) {
+        if(array_key_exists($field,$body)) $payload[$field]=$body[$field];
+    }
     $call=ai_paasta_call($admin,'chat','POST','/chat/completions',$payload,null,180);
     $output=ai_extract_text($call['data']);
     $requestId=$call['headers']['x-paasta-request-id']??($call['data']['paasta']['request_id']??null);
@@ -472,6 +475,9 @@ if ($method === 'POST' && $path === '/ai/responses') {
         $payload['tools']=[['type'=>'web_search']];
         $payload['tool_choice']=['type'=>'web_search'];
         $payload['max_tool_calls']=1;
+    }
+    foreach(['tools','tool_choice','response_format','structured_outputs','pdf_processing','max_tool_calls'] as $field) {
+        if(array_key_exists($field,$body)) $payload[$field]=$body[$field];
     }
     $call=ai_paasta_call($admin,'responses','POST','/responses',$payload,null,180);
     $output=ai_extract_text($call['data']);
