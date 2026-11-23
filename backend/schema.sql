@@ -73,3 +73,60 @@ CREATE TABLE IF NOT EXISTS admin_audit_log (
     KEY idx_admin_audit_created (created_at),
     CONSTRAINT fk_admin_audit_user FOREIGN KEY (admin_user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Admin AI console configuration, private usage accounting, and editable prompts.
+
+CREATE TABLE IF NOT EXISTS admin_ai_settings (
+    id TINYINT UNSIGNED NOT NULL PRIMARY KEY,
+    provider VARCHAR(40) NOT NULL DEFAULT 'paasta',
+    base_url VARCHAR(500) NOT NULL DEFAULT 'https://console.paasta.cloud/api/ai/v1',
+    api_key_cipher MEDIUMTEXT NULL,
+    enabled TINYINT(1) NOT NULL DEFAULT 0,
+    default_chat_model VARCHAR(180) NULL,
+    default_image_model VARCHAR(180) NULL,
+    default_audio_model VARCHAR(180) NULL,
+    updated_by BIGINT UNSIGNED NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_ai_settings_admin FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT IGNORE INTO admin_ai_settings (id, provider, base_url, enabled)
+VALUES (1, 'paasta', 'https://console.paasta.cloud/api/ai/v1', 0);
+
+CREATE TABLE IF NOT EXISTS admin_ai_usage_logs (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    operation VARCHAR(60) NOT NULL,
+    endpoint VARCHAR(120) NOT NULL,
+    model VARCHAR(180) NULL,
+    request_id VARCHAR(160) NULL,
+    idempotency_key VARCHAR(100) NULL,
+    http_status SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+    is_success TINYINT(1) NOT NULL DEFAULT 0,
+    prompt_tokens BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    completion_tokens BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    total_tokens BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    charged_toman DECIMAL(20,4) NULL,
+    latency_ms INT UNSIGNED NOT NULL DEFAULT 0,
+    error_code VARCHAR(120) NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_ai_usage_created (created_at),
+    KEY idx_ai_usage_model (model),
+    KEY idx_ai_usage_status (is_success, http_status),
+    KEY idx_ai_usage_request (request_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS admin_ai_prompt_templates (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    slug VARCHAR(80) NOT NULL,
+    title VARCHAR(180) NOT NULL,
+    system_prompt MEDIUMTEXT NOT NULL,
+    user_template MEDIUMTEXT NOT NULL,
+    output_schema JSON NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    updated_by BIGINT UNSIGNED NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_ai_prompt_slug (slug),
+    CONSTRAINT fk_ai_prompt_admin FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
