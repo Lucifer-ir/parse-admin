@@ -25,7 +25,7 @@ exec > >(tee -a "$LOG_FILE") 2>&1
 trap 'echo "[ERROR] Installation failed at line $LINENO. See $LOG_FILE" >&2' ERR
 export DEBIAN_FRONTEND=noninteractive
 
-echo "[1/8] Installing Nginx, MySQL, PHP-FPM and required extensions..."
+echo "[1/9] Installing Nginx, MySQL, PHP-FPM and required extensions..."
 apt-get update
 apt-get install -y ca-certificates curl git nginx rsync mysql-server openssl certbot cron python3-certbot-nginx php-fpm php-cli php-mysql php-curl php-mbstring
 
@@ -38,7 +38,7 @@ if [[ ! -S "$PHP_FPM_SOCK" ]]; then
 fi
 systemctl enable --now mysql nginx "$PHP_FPM_SERVICE"
 
-echo "[2/8] Updating repository..."
+echo "[2/9] Updating repository..."
 if [[ -d "$INSTALL_DIR/.git" ]]; then
   git -C "$INSTALL_DIR" fetch --all --prune
   git -C "$INSTALL_DIR" reset --hard origin/main
@@ -57,8 +57,9 @@ php -l "$INSTALL_DIR/backend/config.php"
 php -l "$INSTALL_DIR/backend/public/index.php"
 php -l "$INSTALL_DIR/backend/bin/create-admin.php"
 bash -n "$INSTALL_DIR/install.sh"
+bash -n "$INSTALL_DIR/backend/bin/backup-db.sh"
 
-echo "[3/8] Publishing the static admin panel..."
+echo "[3/9] Publishing the static admin panel..."
 install -d -m 0755 "$WEB_ROOT"
 find "$WEB_ROOT" -mindepth 1 -maxdepth 1 ! -name index.html ! -name assets ! -name .well-known -exec rm -rf {} +
 install -m 0644 "$INSTALL_DIR/index.html" "$WEB_ROOT/index.html"
@@ -68,7 +69,7 @@ chown -R www-data:www-data "$WEB_ROOT"
 find "$WEB_ROOT" -type d -exec chmod 755 {} \;
 find "$WEB_ROOT" -type f -exec chmod 644 {} \;
 
-echo "[4/8] Preparing MySQL database and restricted application user..."
+echo "[4/9] Preparing MySQL database and restricted application user..."
 DB_NAME="parse_admin"
 DB_USER="parse_admin_app"
 if [[ -f /etc/parse-api.env ]]; then
@@ -89,7 +90,7 @@ FLUSH PRIVILEGES;
 SQL
 mysql "$DB_NAME" < "$INSTALL_DIR/backend/schema.sql"
 
-echo "[5/8] Installing private API configuration and PHP files..."
+echo "[5/9] Installing private API configuration and PHP files..."
 install -d -o root -g www-data -m 0750 /opt/parse-admin/backend
 chown -R root:www-data "$INSTALL_DIR/backend"
 find "$INSTALL_DIR/backend" -type d -exec chmod 0750 {} \;
