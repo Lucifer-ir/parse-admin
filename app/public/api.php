@@ -414,6 +414,7 @@ if ($method === 'POST' && $path === '/ai/chat/stream') {
     curl_close($curl);
 
     $usageData=[];
+    $streamText='';
     foreach(preg_split('/\\r?\\n/',$raw) as $line){
         if(!str_starts_with($line,'data:')) continue;
         $chunk=trim(substr($line,5));
@@ -421,6 +422,8 @@ if ($method === 'POST' && $path === '/ai/chat/stream') {
         $decoded=json_decode($chunk,true);
         if(is_array($decoded)&&isset($decoded['usage'])) $usageData['usage']=$decoded['usage'];
         if(is_array($decoded)&&isset($decoded['paasta'])) $usageData['paasta']=$decoded['paasta'];
+        $delta=$decoded['choices'][0]['delta']['content']??null;
+        if(is_string($delta)) $streamText.=$delta;
     }
     if($ok===false){
         error_log('Paasta streaming transport error: '.$curlError);
@@ -428,6 +431,10 @@ if ($method === 'POST' && $path === '/ai/chat/stream') {
         exit;
     }
     ai_record_usage($admin,'chat_stream','/chat/completions',$model,$status,$usageData,$responseHeaders,$latency);
+    $streamRequestId=$responseHeaders['x-paasta-request-id']??($usageData['paasta']['request_id']??null);
+    if(!empty($body['save_history']) && $status>=200 && $status<300) {
+        ai_save_history($admin,'chat','گفت‌وگوی جریانی',$model,$message,$streamText,(string)$streamRequestId);
+    }
     if($status<200||$status>=300){
         error_log('Paasta streaming returned HTTP '.$status);
         echo "\nevent: error\ndata: ".json_encode(['error'=>'درخواست جریانی توسط درگاه رد شد.','provider_status'=>$status,'request_id'=>$responseHeaders['x-paasta-request-id']??null],JSON_UNESCAPED_UNICODE)."\n\n";
