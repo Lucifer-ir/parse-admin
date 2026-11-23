@@ -95,7 +95,7 @@ if ($method === 'POST' && $path === '/auth/login') {
         $password = (string)($body['password'] ?? '');
         if ($login === '' || $password === '') respond(422, ['message' => 'نام کاربری و رمز عبور الزامی است.']);
         $stmt = $pdo->prepare(
-            'SELECT id,username,phone,name,email,password_hash,role,status,level,group_name
+            'SELECT id,username,phone,name,email,password_hash,status,level,group_name,track_id
              FROM students WHERE username=? OR phone=? LIMIT 1'
         );
         $stmt->execute([$login, $login]);
@@ -107,6 +107,7 @@ if ($method === 'POST' && $path === '/auth/login') {
             $pdo->prepare('UPDATE students SET password_hash=? WHERE id=?')->execute([password_hash($password, PASSWORD_DEFAULT), (int)$student['id']]);
         }
         unset($student['password_hash']);
+        $student['role'] = 'student';
         $token = parse_issue_student_token($pdo, (int)$student['id']);
         parse_store_event($pdo, (int)$student['id'], 'login', '/auth/login', ['platform' => $body['platform'] ?? 'unknown']);
         respond(200, ['token' => $token, 'user' => $student]);
@@ -167,7 +168,7 @@ if ($method === 'GET' && $path === '/activities') {
          WHERE saa.student_id=? AND a.status=\'published\' AND (a.track_id IS NULL OR a.track_id=?)
          ORDER BY a.due_at IS NULL,a.due_at,a.id DESC'
     );
-    $stmt->execute([(int)$student['id'],(int)($student['track_id'] ?? 0)]);
+    $stmt->execute([(int)$student['id'],(int)($student['track_id'] ?? 0),(string)($student['level'] ?? '')]);
     respond(200,['rows'=>$stmt->fetchAll()]);
 }
 
@@ -271,7 +272,7 @@ if ($method === 'GET' && preg_match('#^/exams/([1-9][0-9]*)$#', $path, $m)) {
         'SELECT id,title,description,subject,level,track_id,duration_minutes,starts_at,ends_at,show_result,status
          FROM exams WHERE id=? AND status=\'published\' AND (target_student_id IS NULL OR target_student_id=?) AND (track_id IS NULL OR track_id=?) LIMIT 1'
     );
-    $stmt->execute([$examId, (int)$student['id'],(int)($student['track_id'] ?? 0)]);
+    $stmt->execute([$examId, (int)$student['id'],(int)($student['track_id'] ?? 0),(string)($student['level'] ?? '')]);
     $exam = $stmt->fetch();
     if (!$exam) respond(404, ['message' => 'آزمون پیدا نشد یا در دسترس نیست.']);
     $q = $pdo->prepare(
@@ -298,7 +299,7 @@ if ($method === 'POST' && preg_match('#^/exams/([1-9][0-9]*)/start$#', $path, $m
          AND (starts_at IS NULL OR starts_at<=UTC_TIMESTAMP())
          AND (ends_at IS NULL OR ends_at>=UTC_TIMESTAMP()) LIMIT 1'
     );
-    $check->execute([$examId, (int)$student['id'],(int)($student['track_id'] ?? 0)]);
+    $check->execute([$examId, (int)$student['id'],(int)($student['track_id'] ?? 0),(string)($student['level'] ?? '')]);
     $exam = $check->fetch();
     if (!$exam) respond(404, ['message' => 'آزمون در حال حاضر در دسترس نیست.']);
     $existing = $pdo->prepare(
@@ -317,8 +318,12 @@ if ($method === 'POST' && preg_match('#^/exams/([1-9][0-9]*)/start$#', $path, $m
         $reload->execute([$attemptId]);
         $attempt = $reload->fetch() ?: ['id' => $attemptId];
     }
+    $answerStmt = $pdo->prepare('SELECT question_id,answer_json FROM exam_answers WHERE attempt_id=?');
+    $answerStmt->execute([(int)$attempt['id']]);
+    $savedAnswers = [];
+    foreach ($answerStmt->fetchAll() as $saved) $savedAnswers[(string)$saved['question_id']] = json_decode((string)$saved['answer_json'], true);
     parse_store_event($pdo, (int)$student['id'], 'exam.start', '/exams/'.$examId, ['attempt_id' => (int)$attempt['id']]);
-    respond(200, ['attempt' => $attempt]);
+    respond(200, ['attempt' => $attempt, 'answers' => $savedAnswers]);
 }
 
 if ($method === 'POST' && preg_match('#^/exams/([1-9][0-9]*)/answers$#', $path, $m)) {
@@ -354,7 +359,8 @@ if ($method === 'POST' && preg_match('#^/exams/([1-9][0-9]*)/submit$#', $path, $
          ORDER BY id DESC LIMIT 1'
     );
     $attemptStmt->execute([$examId, (int)$student['id']]);
-    $attemptId = (int)$attemptStmt->fetchColumn();
+    $attemptRow = $attemptStmt->fetch();
+    $attemptId = (int)($attemptRow['id'] ?? 0);
     if ($attemptId < 1) respond(404, ['message' => 'آزمون فعالی برای ثبت پاسخ پیدا نشد.']);
     $rows = $pdo->prepare(
         'SELECT a.id,a.answer_json,q.question_type,q.answer_json AS correct_answer,eq.points
@@ -386,5 +392,5 @@ if ($method === 'POST' && preg_match('#^/exams/([1-9][0-9]*)/submit$#', $path, $
         'UPDATE exam_attempts SET submitted_at=UTC_TIMESTAMP(),score=?,total_points=?,status=\'submitted\' WHERE id=?'
     )->execute([$score, $total, $attemptId]);
     parse_store_event($pdo, (int)$student['id'], 'exam.submit', '/exams/'.$examId, ['attempt_id' => $attemptId]);
-    respond(200, ['submitted' => true, 'score' => $score, 'total_points' => $total, 'pending_manual_review' => $manual]);
+    respond(200, ['submitted' => true, 'status' => $finalStatus, 'score' => $score, 'total_points' => $total, 'pending_manual_review' => $manual]);
 }
