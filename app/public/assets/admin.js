@@ -1028,6 +1028,35 @@
       finally { setBusy(form,false); }
     });
 
+
+    $('#trackCreateForm').addEventListener('submit',async event=>{
+      event.preventDefault();const form=event.currentTarget;const data=payloadFromForm(form);
+      setBusy(form,true,'در حال ذخیره مسیر آموزشی...');
+      try{const result=await api('/platform/tracks',{method:'POST',body:json(data)});form.reset();setMessage('#trackCreateMessage','مسیر آموزشی ذخیره شد. شناسه: '+number(result.id),'success');await loadTracks();}
+      catch(error){setMessage('#trackCreateMessage',error.message,'error');}
+      finally{setBusy(form,false);}
+    });
+
+    $('#activityCreateForm').addEventListener('submit',async event=>{
+      event.preventDefault();const form=event.currentTarget;const data=payloadFromForm(form);
+      data.question_ids=String(data.question_ids||'').split(',').map(value=>Number(value.trim())).filter(value=>Number.isSafeInteger(value)&&value>0);
+      data.track_id=data.track_id?Number(data.track_id):null;
+      data.target_student_id=data.target_student_id?Number(data.target_student_id):null;
+      if(data.due_at)data.due_at=data.due_at.replace('T',' ')+(data.due_at.length===16?':00':'');
+      setBusy(form,true,'در حال ساخت و تخصیص تمرین...');
+      try{const result=await api('/platform/activities',{method:'POST',body:json(data)});form.reset();setMessage('#activityCreateMessage','تمرین ایجاد شد و برای '+number(result.assigned_students)+' دانش‌آموز تخصیص یافت. شناسه: '+number(result.id),'success');await loadActivities();}
+      catch(error){setMessage('#activityCreateMessage',error.message,'error');}
+      finally{setBusy(form,false);}
+    });
+
+    $('#activitySubmissionAnswers').addEventListener('submit',async event=>{
+      const form=event.target.closest('.grade-activity-answer-form');if(!form)return;
+      event.preventDefault();const answerId=Number(form.dataset.answerId);const data=payloadFromForm(form);data.awarded_points=Number(data.awarded_points);
+      try{await api('/platform/activity-answers/'+answerId+'/grade',{method:'POST',body:json(data)});toast('نمره پاسخ ذخیره شد.','success');await loadActivitySubmissions();}
+      catch(error){toast(error.message,'error');}
+    });
+    $('#closeActivitySubmissionDetail').addEventListener('click',()=>$('#activitySubmissionDetailPanel').hidden=true);
+
     $('#platformSettingsForm').addEventListener('submit',async event=>{
       event.preventDefault();const data=payloadFromForm(event.currentTarget);
       try { const result=await api('/platform/settings',{method:'POST',body:json(data)});setMessage('#platformSettingsMessage',result.message,'success');await loadPlatformSettings(); }
@@ -1091,6 +1120,21 @@
       try{await api('/platform/exams/'+Number(button.dataset.examStatus)+'/status',{method:'POST',body:json({status})});await loadExams();}
       catch(error){toast(error.message,'error');}
     });
+
+    $('#trackRows').addEventListener('click',async event=>{
+      const button=event.target.closest('[data-track-status]');if(!button)return;
+      try{await api('/platform/tracks/'+Number(button.dataset.trackStatus)+'/status',{method:'POST',body:json({active:button.dataset.active!=='1'})});await loadTracks();}
+      catch(error){toast(error.message,'error');}
+    });
+    $('#activityRows').addEventListener('click',async event=>{
+      const button=event.target.closest('[data-activity-status]');if(!button)return;
+      const status=button.dataset.status==='published'?'closed':'published';
+      try{await api('/platform/activities/'+Number(button.dataset.activityStatus)+'/status',{method:'POST',body:json({status})});await loadActivities();}
+      catch(error){toast(error.message,'error');}
+    });
+    $('#activitySubmissionRows').addEventListener('click',event=>{
+      const button=event.target.closest('[data-activity-submission-detail]');if(button)loadActivitySubmissionDetail(Number(button.dataset.activitySubmissionDetail));
+    });
     $('#attemptRows').addEventListener('click',event=>{
       const button=event.target.closest('[data-attempt-detail]');if(button)loadAttemptDetail(Number(button.dataset.attemptDetail));
     });
@@ -1102,6 +1146,10 @@
     $('#refreshExams').addEventListener('click',loadExams);
     $('#refreshAttempts').addEventListener('click',loadAttempts);
     $('#refreshMonitoring').addEventListener('click',loadMonitoring);
+    $('#refreshTracks').addEventListener('click',loadTracks);
+    $('#refreshActivities').addEventListener('click',loadActivities);
+    $('#refreshActivitySubmissions').addEventListener('click',loadActivitySubmissions);
+
     $('#studentSearch').addEventListener('input',()=>loadStudents());
     $('#studentStatusFilter').addEventListener('change',loadStudents);
   }
