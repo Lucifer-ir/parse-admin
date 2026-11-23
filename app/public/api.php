@@ -293,8 +293,8 @@ if ($method === 'POST' && $path === '/settings/font') {
     chmod($target, 0640);
     $fontUrl = '/assets/fonts/' . $filename;
     $format = $formats[$extension];
-    $css = "@font-face{font-family:'ParseCustom';src:url('" . $fontUrl . "') format('" . $format . "');font-display:swap;font-style:normal;font-weight:100 900;} :root{--font-family:'ParseCustom',Tahoma,sans-serif;} html,body,button,input,textarea,select{font-family:'ParseCustom',Tahoma,sans-serif!important;}";
-    file_put_contents(__DIR__ . '/assets/custom-font.css', $css, LOCK_EX);
+    $css = "@font-face{font-family:'ParseCustom';src:url('" . $fontUrl . "') format('" . $format . "');font-display:swap;font-style:normal;font-weight:100 900;} :root{font-family:'ParseCustom',Tahoma,sans-serif;} html,body,button,input,textarea,select{font-family:'ParseCustom',Tahoma,sans-serif!important;}";
+    file_put_contents($directory . '/custom-font.css', $css, LOCK_EX);
     $pdo = app_db();
     $old = $pdo->query('SELECT custom_font_filename FROM admin_ui_settings WHERE id=1')->fetchColumn();
     $pdo->prepare('UPDATE admin_ui_settings SET custom_font_filename=?,updated_by=? WHERE id=1')
