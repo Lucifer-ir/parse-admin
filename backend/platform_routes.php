@@ -217,7 +217,10 @@ if ($method === 'POST' && preg_match('#^/exams/([1-9][0-9]*)/start$#', $path, $m
             'INSERT INTO exam_attempts (exam_id,student_id,started_at,expires_at)
              VALUES (?,?,UTC_TIMESTAMP(),DATE_ADD(UTC_TIMESTAMP(),INTERVAL ? MINUTE))'
         )->execute([$examId, (int)$student['id'], (int)$exam['duration_minutes']]);
-        $attempt = ['id' => (int)$pdo->lastInsertId()];
+        $attemptId = (int)$pdo->lastInsertId();
+        $reload = $pdo->prepare('SELECT id,started_at,expires_at,status FROM exam_attempts WHERE id=?');
+        $reload->execute([$attemptId]);
+        $attempt = $reload->fetch() ?: ['id' => $attemptId];
     }
     parse_store_event($pdo, (int)$student['id'], 'exam.start', '/exams/'.$examId, ['attempt_id' => (int)$attempt['id']]);
     respond(200, ['attempt' => $attempt]);
