@@ -224,7 +224,7 @@ if ($method === 'POST' && preg_match('#^/activities/([1-9][0-9]*)/submit$#',$pat
          VALUES(?,?,?,?,?) ON DUPLICATE KEY UPDATE answer_json=VALUES(answer_json),is_correct=VALUES(is_correct),awarded_points=VALUES(awarded_points),answered_at=UTC_TIMESTAMP()'
       );
       $score=0.0;$total=0.0;$manual=0;
-      $totalStmt=$pdo->prepare('SELECT COALESCE(SUM(points),0) FROM activity_questions WHERE activity_id=?');
+      $totalStmt=$pdo->prepare('SELECT COALESCE(SUM(q.points),0) FROM activity_questions aq JOIN question_bank q ON q.id=aq.question_id WHERE aq.activity_id=?');
       $totalStmt->execute([$activityId]);
       $total=(float)$totalStmt->fetchColumn();
       foreach($answers as $entry){
