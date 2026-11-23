@@ -476,18 +476,63 @@ if ($method === 'GET' && $path === '/platform/students') {
 }
 
 if ($method === 'POST' && $path === '/platform/students') {
-    $body=app_request_json();$username=trim((string)($body['username']??''));$name=trim((string)($body['name']??''));$password=(string)($body['password']??'');$phone=trim((string)($body['phone']??''));$code=trim((string)($body['student_code']??''));$email=trim((string)($body['email']??''));
-    if(!preg_match('/^[a-zA-Z0-9_.-]{3,100}$/',$username)||$name===''||strlen($password)<8||mb_strlen($name)>200)app_json(422,['error'=>'نام، نام کاربری معتبر و رمز عبور حداقل ۸ کاراکتری الزامی است.']);
+    $body=app_request_json();
+    $username=trim((string)($body['username']??''));
+    $name=trim((string)($body['name']??''));
+    $password=(string)($body['password']??'');
+    $phone=trim((string)($body['phone']??''));
+    $code=trim((string)($body['student_code']??''));
+    $email=trim((string)($body['email']??''));
+    $trackId=!empty($body['track_id'])?(int)$body['track_id']:null;
+
+    if(!preg_match('/^[a-zA-Z0-9_.-]{3,100}$/',$username)||$name===''||strlen($password)<8||mb_strlen($name)>200)
+        app_json(422,['error'=>'نام، نام کاربری معتبر و رمز عبور حداقل ۸ کاراکتری الزامی است.']);
+    if($phone!==''&&!preg_match('/^[0-9+() -]{8,20}$/',$phone))
+        app_json(422,['error'=>'شماره تماس معتبر نیست.']);
+
     $pdo=app_db();
-    try{$pdo->beginTransaction();$hash=password_hash($password,PASSWORD_DEFAULT);
+    // Report conflicts before the insert so the 409 message accurately identifies the field.
+    $checks=[
+        ['username',$username,'نام کاربری'],
+        ['phone',$phone,'شماره تماس'],
+        ['student_code',$code,'کد دانش‌آموزی'],
+    ];
+    foreach($checks as [$column,$value,$label]){
+        if($value==='') continue;
+        $check=$pdo->prepare("SELECT id FROM students WHERE {$column}=? LIMIT 1");
+        $check->execute([$value]);
+        if($check->fetchColumn()) app_json(409,['error'=>"{$label} قبلاً ثبت شده است."]);
+    }
+    if($trackId!==null){
+        $check=$pdo->prepare('SELECT id FROM learning_tracks WHERE id=? AND active=1');
+        $check->execute([$trackId]);
+        if(!$check->fetchColumn()) app_json(422,['error'=>'مسیر آموزشی انتخاب‌شده معتبر نیست یا غیرفعال است.']);
+    }
+
+    try{
+      $pdo->beginTransaction();
+      $hash=password_hash($password,PASSWORD_DEFAULT);
       $stmt=$pdo->prepare('INSERT INTO students(username,student_code,phone,name,email,password_hash,status,level,group_name,track_id) VALUES(?,?,?,?,?,?,?,?,?,?)');
-      $stmt->execute([$username,$code!==''?$code:null,$phone!==''?$phone:null,$name,$email!==''?$email:null,$hash,in_array(($body['status']??'active'),['active','disabled','pending'],true)?$body['status']:'active',trim((string)($body['level']??''))?:null,trim((string)($body['group_name']??''))?:null,!empty($body['track_id'])?(int)$body['track_id']:null]);
+      $stmt->execute([
+        $username,$code!==''?$code:null,$phone!==''?$phone:null,$name,$email!==''?$email:null,$hash,
+        in_array(($body['status']??'active'),['active','disabled','pending'],true)?$body['status']:'active',
+        trim((string)($body['level']??''))?:null,trim((string)($body['group_name']??''))?:null,$trackId
+      ]);
       $studentId=(int)$pdo->lastInsertId();
-      // Student sign-in uses students + student_auth_tokens; users is reserved for admin accounts.
+      // Mobile authentication uses students + student_auth_tokens, not the admin users table.
       $pdo->commit();
-    }catch(PDOException $e){if($pdo->inTransaction())$pdo->rollBack();if((string)$e->getCode()==='23000')app_json(409,['error'=>'نام کاربری یا شماره تماس/کد دانش‌آموزی در یکی از بخش‌های سامانه تکراری است.']);throw $e;}
-    catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
-    $audit=$pdo->prepare('INSERT INTO admin_audit_log(admin_user_id,action,target_type,target_id,ip_address) VALUES(?,?,?,?,?)');$audit->execute([(int)$admin['id'],'student.create','student',$studentId,substr((string)($_SERVER['REMOTE_ADDR']??''),0,45)]);
+    }catch(PDOException $e){
+      if($pdo->inTransaction())$pdo->rollBack();
+      error_log('Parse student create failed [SQLSTATE '.$e->getCode().']: '.$e->getMessage());
+      if((string)$e->getCode()==='23000') app_json(409,['error'=>'اطلاعات دانش‌آموز با رکورد دیگری تداخل دارد. نام کاربری، شماره تماس یا کد دانش‌آموزی را بررسی کنید.']);
+      throw $e;
+    }catch(Throwable $e){
+      if($pdo->inTransaction())$pdo->rollBack();
+      error_log('Parse student create failed: '.$e->getMessage());
+      throw $e;
+    }
+    $audit=$pdo->prepare('INSERT INTO admin_audit_log(admin_user_id,action,target_type,target_id,ip_address) VALUES(?,?,?,?,?)');
+    $audit->execute([(int)$admin['id'],'student.create','student',$studentId,substr((string)($_SERVER['REMOTE_ADDR']??''),0,45)]);
     app_json(201,['ok'=>true,'id'=>$studentId]);
 }
 
