@@ -12,7 +12,7 @@
 
   const savedApi = normalizeBase(localStorage.getItem(API_KEY) || '');
   // Ignore stale placeholder URLs left by the earlier login-screen API form.
-  let apiBase = /example\\.com|example\\.org/i.test(savedApi) ? DEFAULT_API : (savedApi || DEFAULT_API);
+  let apiBase = /(?:example[.]com|example[.]org)/i.test(savedApi) ? DEFAULT_API : (savedApi || DEFAULT_API);
   let token = sessionStorage.getItem(TOKEN_KEY) || '';
   let usersCache = [];
   let questionsCache = [];
@@ -255,7 +255,20 @@
     submit.textContent = 'در حال بررسی اطلاعات...';
 
     try {
-      await checkHealth(base);
+      try {
+        await checkHealth(base);
+      } catch (healthError) {
+        // Recover from stale custom/example URLs saved by the older login form.
+        if (base === DEFAULT_API) throw healthError;
+        try {
+          await checkHealth(DEFAULT_API);
+          base = DEFAULT_API;
+          apiBase = DEFAULT_API;
+        } catch {
+          throw healthError;
+        }
+      }
+
       const result = await request('/auth/login', {
         method: 'POST',
         auth: false,
