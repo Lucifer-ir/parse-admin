@@ -538,10 +538,26 @@
     });
 
     $('#imageEditForm').addEventListener('submit',async event=>{
-      event.preventDefault();const form=$('#imageEditForm');const body=new FormData(form);setBusy(form,true,'در حال ویرایش...');
-      try{const result=await api('/ai/image-edit',{method:'POST',body});$('#imageEditOutput').textContent=formatObject(result.data);setMessage('#imageEditMessage','درخواست ویرایش انجام شد.','success');}
-      catch(error){setMessage('#imageEditMessage',error.message,'error');}
-      finally{setBusy(form,false);}
+      event.preventDefault();
+      const form=$('#imageEditForm');
+      const data=payloadFromForm(form);
+      const urls=String(data.image_urls||'').split(/\\r?\\n/).map(value=>value.trim()).filter(Boolean);
+      setBusy(form,true,'در حال ویرایش...');
+      try {
+        if(urls.length<1||urls.length>4) throw new Error('بین ۱ تا ۴ نشانی عمومی HTTPS وارد کنید.');
+        if(urls.some(url=>!/^https:\\/\\//i.test(url))) throw new Error('فقط نشانی عمومی HTTPS پذیرفته می‌شود.');
+        const payload={model:data.model,prompt:data.prompt};
+        if(urls.length===1) payload.image_url=urls[0];
+        else payload.image_urls=urls;
+        if(data.mask_url) payload.mask_url=data.mask_url;
+        const result=await api('/ai/image-edit',{method:'POST',body:json(payload)});
+        $('#imageEditOutput').textContent=formatObject(result.data);
+        setMessage('#imageEditMessage','ویرایش تصویر با موفقیت انجام شد.','success');
+      } catch(error) {
+        setMessage('#imageEditMessage',error.message,'error');
+      } finally {
+        setBusy(form,false);
+      }
     });
 
     $('#transcribeForm').addEventListener('submit',async event=>{
