@@ -587,7 +587,9 @@ if ($method === 'POST' && $path === '/ai/messages') {
     if(!is_array($messages)||count($messages)<1) $messages=[['role'=>'user','content'=>mb_substr($message,0,50000)]];
     $payload=['model'=>$model,'max_tokens'=>min(8192,max(64,(int)($body['max_tokens']??1024))),'messages'=>$messages];
     if(!empty($body['system'])) $payload['system']=mb_substr((string)$body['system'],0,10000);
-    if(isset($body['pdf_processing'])) $payload['pdf_processing']=$body['pdf_processing'];
+    foreach(['pdf_processing','tools','tool_choice','thinking','stop_sequences','temperature','top_p','top_k','metadata'] as $field) {
+        if(array_key_exists($field,$body)) $payload[$field]=$body[$field];
+    }
     $call=ai_paasta_call($admin,'anthropic_messages','POST','/messages',$payload,null,180,'https://console.paasta.cloud/api/ai');
     $output=ai_extract_text($call['data']);
     app_json(200,['output'=>$output,'data'=>$call['data'],'request_id'=>$call['headers']['x-paasta-request-id']??null]);
@@ -617,6 +619,102 @@ if ($method === 'POST' && $path === '/ai/responses') {
         ai_save_history($admin,'response','Responses API',$model,$historyPrompt,$output,(string)$requestId);
     }
     app_json(200,['output'=>$output,'data'=>$call['data'],'request_id'=>$requestId]);
+}
+
+if ($method === 'POST' && $path === '/ai/responses/stream') {
+    if(!function_exists('curl_init')) app_json(500,['error'=>'افزونه cURL نصب نیست.']);
+    $body=app_request_json();
+    $model=trim((string)($body['model']??''));
+    $input=$body['input']??'';
+    if(is_string($input)) $input=mb_substr(trim($input),0,50000);
+    if($model===''||((is_string($input)&&$input==='')||(!is_string($input)&&(!is_array($input)||count($input)<1)))) {
+        app_json(422,['error'=>'مدل و ورودی معتبر برای Responses Stream الزامی هستند.']);
+    }
+    $apiKey=app_paasta_key();
+    if($apiKey==='') app_json(409,['error'=>'ابتدا کلید API پاستا را در تنظیمات ثبت کنید.']);
+    $payload=[
+        'model'=>$model,
+        'input'=>$input,
+        'max_output_tokens'=>min(8192,max(64,(int)($body['max_output_tokens']??1024))),
+        'store'=>false,
+        'stream'=>true
+    ];
+    if(!empty($body['instructions'])) $payload['instructions']=mb_substr((string)$body['instructions'],0,10000);
+    foreach(['tools','tool_choice','response_format','structured_outputs','pdf_processing','max_tool_calls'] as $field) {
+        if(array_key_exists($field,$body)) $payload[$field]=$body[$field];
+    }
+    $headers=['Authorization: Bearer '.$apiKey,'Content-Type: application/json','Accept: text/event-stream','Idempotency-Key: '.bin2hex(random_bytes(18))];
+    $responseHeaders=[];$raw='';
+    $curl=curl_init(PAASTA_AI_BASE.'/responses');
+    curl_setopt_array($curl,[
+        CURLOPT_POST=>true,
+        CURLOPT_POSTFIELDS=>json_encode($payload,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),
+        CURLOPT_HTTPHEADER=>$headers,
+        CURLOPT_RETURNTRANSFER=>false,
+        CURLOPT_CONNECTTIMEOUT=>15,
+        CURLOPT_TIMEOUT=>240,
+        CURLOPT_SSL_VERIFYPEER=>true,
+        CURLOPT_SSL_VERIFYHOST=>2,
+        CURLOPT_HEADERFUNCTION=>static function($ch,string $line) use (&$responseHeaders):int{
+            $length=strlen($line);$parts=explode(':',$line,2);
+            if(count($parts)===2)$responseHeaders[strtolower(trim($parts[0]))]=trim($parts[1]);
+            return $length;
+        },
+        CURLOPT_WRITEFUNCTION=>static function($ch,string $chunk) use (&$raw):int{
+            $raw.=$chunk;
+            $httpStatus=(int)curl_getinfo($ch,CURLINFO_RESPONSE_CODE);
+            if($httpStatus>=200&&$httpStatus<300){
+                echo $chunk;
+                if(function_exists('ob_flush')) @ob_flush();
+                flush();
+            }
+            return strlen($chunk);
+        },
+    ]);
+    header('Content-Type: text/event-stream; charset=utf-8');
+    header('Cache-Control: no-cache, no-transform');
+    header('Connection: keep-alive');
+    header('X-Accel-Buffering: no');
+    while(ob_get_level()>0) @ob_end_flush();
+    $started=microtime(true);
+    $ok=curl_exec($curl);
+    $curlError=curl_error($curl);
+    $status=(int)curl_getinfo($curl,CURLINFO_RESPONSE_CODE);
+    $latency=(int)round((microtime(true)-$started)*1000);
+    curl_close($curl);
+
+    if($ok===false){
+        error_log('Paasta Responses stream transport error: '.$curlError);
+        echo "event: error\ndata: ".json_encode(['error'=>'ارتباط جریانی Responses با درگاه قطع شد.'])."\n\n";
+        exit;
+    }
+    $usageData=[];$streamText='';
+    foreach(preg_split('/\\r?\\n/',$raw) as $line){
+        if(!str_starts_with($line,'data:')) continue;
+        $chunk=trim(substr($line,5));
+        if($chunk===''||$chunk==='[DONE]') continue;
+        $event=json_decode($chunk,true);
+        if(!is_array($event)) continue;
+        $response=$event['response']??[];
+        if(isset($response['usage'])) $usageData['usage']=$response['usage'];
+        if(isset($event['usage'])) $usageData['usage']=$event['usage'];
+        if(isset($response['paasta'])) $usageData['paasta']=$response['paasta'];
+        if(isset($event['paasta'])) $usageData['paasta']=$event['paasta'];
+        $delta=$event['delta']??$event['text']??null;
+        if(is_string($delta)&&str_contains((string)($event['type']??''),'output_text')) $streamText.=$delta;
+    }
+    ai_record_usage($admin,'responses_stream','/responses',$model,$status,$usageData,$responseHeaders,$latency);
+    $streamRequestId=$responseHeaders['x-paasta-request-id']??($usageData['paasta']['request_id']??null);
+    if(!empty($body['save_history'])&&$status>=200&&$status<300){
+        $historyPrompt=is_string($input)?$input:json_encode($input,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
+        ai_save_history($admin,'response','Responses API · Stream',$model,$historyPrompt,$streamText,(string)$streamRequestId);
+    }
+    if($status<200||$status>=300){
+        $providerError=ai_json_decode($raw);
+        $message=$providerError['error']['message']??$providerError['detail']??'درخواست Responses Stream رد شد.';
+        echo "\nevent: error\ndata: ".json_encode(['error'=>is_string($message)?$message:'خطای Provider','provider_status'=>$status,'request_id'=>$streamRequestId],JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)."\n\n";
+    }
+    exit;
 }
 
 if ($method === 'POST' && $path === '/ai/decisions') {
