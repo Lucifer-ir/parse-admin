@@ -104,6 +104,7 @@ function ai_paasta_call(
         CURLOPT_HTTPHEADER => $headers,
         CURLOPT_SSL_VERIFYPEER => true,
         CURLOPT_SSL_VERIFYHOST => 2,
+        CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,
         CURLOPT_HEADERFUNCTION => static function ($ch, string $line) use (&$responseHeaders): int {
             $length = strlen($line);
             $parts = explode(':', $line, 2);
@@ -611,29 +612,53 @@ if ($method === 'POST' && $path === '/ai/messages') {
 }
 
 if ($method === 'POST' && $path === '/ai/responses') {
-    $body=app_request_json();
-    $model=trim((string)($body['model']??''));
-    $input=$body['input']??'';
-    if(is_string($input)) $input=mb_substr(trim($input),0,50000);
-    if($model===''||((is_string($input)&&$input==='')||(!is_string($input)&&(!is_array($input)||count($input)<1)))) app_json(422,['error'=>'مدل و ورودی معتبر الزامی هستند.']);
-    $payload=['model'=>$model,'input'=>$input,'max_output_tokens'=>min(8192,max(64,(int)($body['max_output_tokens']??1024))),'store'=>false,'stream'=>false];
-    if(!empty($body['instructions'])) $payload['instructions']=mb_substr((string)$body['instructions'],0,10000);
-    if(!empty($body['web_search'])) {
-        $payload['tools']=[['type'=>'web_search']];
-        $payload['tool_choice']=['type'=>'web_search'];
-        $payload['max_tool_calls']=1;
+    $body = app_request_json();
+    $model = trim((string)($body['model'] ?? ''));
+    $input = $body['input'] ?? '';
+    if (is_string($input)) $input = trim($input);
+    if ($model === '' || (is_string($input) && $input === '') ||
+        (!is_string($input) && (!is_array($input) || count($input) < 1))) {
+        app_json(422, ['error' => 'مدل و ورودی معتبر الزامی هستند.']);
     }
-    foreach(['tools','tool_choice','response_format','structured_outputs','pdf_processing','max_tool_calls'] as $field) {
-        if(array_key_exists($field,$body)) $payload[$field]=$body[$field];
+
+    $webSearch = !empty($body['web_search']);
+    if ($webSearch && (!is_string($input) || mb_strlen($input) > 4000)) {
+        app_json(422, ['error' => 'جست‌وجوی وب فقط ورودی متنی تا ۴۰۰۰ نویسه را می‌پذیرد.']);
     }
-    $call=ai_paasta_call($admin,'responses','POST','/responses',$payload,null,180);
-    $output=ai_extract_text($call['data']);
-    $requestId=$call['headers']['x-paasta-request-id']??($call['data']['paasta']['request_id']??null);
-    if(!empty($body['save_history'])) {
-        $historyPrompt=is_string($input)?$input:json_encode($input,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
-        ai_save_history($admin,'response','Responses API',$model,$historyPrompt,$output,(string)$requestId);
+    if (is_string($input)) $input = mb_substr($input, 0, 50000);
+
+    $payload = [
+        'model' => $model,
+        'input' => $input,
+        'max_output_tokens' => min(8192, max(64, (int)($body['max_output_tokens'] ?? 1024))),
+        'store' => false,
+        'stream' => false,
+    ];
+    if (!empty($body['instructions'])) $payload['instructions'] = mb_substr((string)$body['instructions'], 0, 10000);
+
+    foreach (['response_format','structured_outputs','pdf_processing'] as $field) {
+        if (array_key_exists($field, $body)) $payload[$field] = $body[$field];
     }
-    app_json(200,['output'=>$output,'data'=>$call['data'],'request_id'=>$requestId]);
+
+    if ($webSearch) {
+        // Web search has a separate billing component and must be explicit and non-streaming.
+        $payload['tools'] = [['type' => 'web_search']];
+        $payload['tool_choice'] = ['type' => 'web_search'];
+        $payload['max_tool_calls'] = 1;
+    } else {
+        foreach (['tools','tool_choice','max_tool_calls'] as $field) {
+            if (array_key_exists($field, $body)) $payload[$field] = $body[$field];
+        }
+    }
+
+    $call = ai_paasta_call($admin, 'responses', 'POST', '/responses', $payload, null, 180);
+    $output = ai_extract_text($call['data']);
+    $requestId = $call['headers']['x-paasta-request-id'] ?? ($call['data']['paasta']['request_id'] ?? null);
+    if (!empty($body['save_history'])) {
+        $historyPrompt = is_string($input) ? $input : json_encode($input, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        ai_save_history($admin, 'response', 'Responses API', $model, (string)$historyPrompt, $output, (string)$requestId);
+    }
+    app_json(200, ['output' => $output, 'data' => $call['data'], 'request_id' => $requestId]);
 }
 
 if ($method === 'POST' && $path === '/ai/responses/stream') {
@@ -755,17 +780,77 @@ if ($method === 'POST' && $path === '/ai/images') {
     app_json(200,['data'=>$call['data'],'request_id'=>$call['headers']['x-paasta-request-id']??null]);
 }
 
+function ai_is_public_https_url(string $url): bool
+{
+    $parts = parse_url(trim($url));
+    if (!$parts || strtolower((string)($parts['scheme'] ?? '')) !== 'https' ||
+        empty($parts['host']) || isset($parts['user']) || isset($parts['pass'])) {
+        return false;
+    }
+
+    $host = strtolower(rtrim((string)$parts['host'], '.'));
+    if ($host === 'localhost' || str_ends_with($host, '.localhost') ||
+        str_ends_with($host, '.local') || str_ends_with($host, '.internal')) {
+        return false;
+    }
+
+    $flags = FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE;
+    if (filter_var($host, FILTER_VALIDATE_IP)) {
+        return filter_var($host, FILTER_VALIDATE_IP, $flags) !== false;
+    }
+
+    $records = dns_get_record($host, DNS_A | DNS_AAAA);
+    if (!is_array($records) || count($records) === 0) return false;
+    $foundAddress = false;
+    foreach ($records as $record) {
+        $ip = $record['ip'] ?? $record['ipv6'] ?? null;
+        if (!is_string($ip)) continue;
+        $foundAddress = true;
+        if (filter_var($ip, FILTER_VALIDATE_IP, $flags) === false) return false;
+    }
+    return $foundAddress;
+}
+
 if ($method === 'POST' && $path === '/ai/image-edit') {
-    $body=$_POST;
-    $model=trim((string)($body['model']??''));
-    $prompt=trim((string)($body['prompt']??''));
-    $imageUrls=array_values(array_filter(array_map('trim',preg_split('/\r?\n/',(string)($body['image_urls']??'')))));
-    if($model===''||$prompt===''||count($imageUrls)<1||count($imageUrls)>4) app_json(422,['error'=>'مدل، شرح و ۱ تا ۴ آدرس HTTPS تصویر الزامی است.']);
-    foreach($imageUrls as $url) if(!filter_var($url,FILTER_VALIDATE_URL)||parse_url($url,PHP_URL_SCHEME)!=='https:') app_json(422,['error'=>'فقط آدرس عمومی HTTPS مجاز است.']);
-    $payload=['model'=>$model,'prompt'=>$prompt,'image_urls'=>json_encode($imageUrls,JSON_UNESCAPED_SLASHES)];
-    if(!empty($body['mask_url'])) $payload['mask_url']=$body['mask_url'];
-    $call=ai_paasta_call($admin,'image_edit','POST','/images/edits',null,$payload,360);
-    app_json(200,['data'=>$call['data'],'request_id'=>$call['headers']['x-paasta-request-id']??null]);
+    $body = app_request_json();
+    $model = trim((string)($body['model'] ?? ''));
+    $prompt = trim((string)($body['prompt'] ?? ''));
+    $hasSingle = array_key_exists('image_url', $body);
+    $hasMultiple = array_key_exists('image_urls', $body);
+    if ($hasSingle === $hasMultiple) {
+        app_json(422, ['error' => 'دقیقاً یکی از image_url یا image_urls باید ارسال شود.']);
+    }
+    if ($model === '' || $prompt === '') {
+        app_json(422, ['error' => 'مدل و شرح ویرایش الزامی هستند.']);
+    }
+
+    $payload = ['model' => $model, 'prompt' => mb_substr($prompt, 0, 10000)];
+    if ($hasSingle) {
+        $url = trim((string)$body['image_url']);
+        if (!ai_is_public_https_url($url)) app_json(422, ['error' => 'image_url باید یک نشانی عمومی HTTPS باشد.']);
+        $payload['image_url'] = $url;
+    } else {
+        $imageUrls = $body['image_urls'];
+        if (!is_array($imageUrls)) app_json(422, ['error' => 'image_urls باید آرایه‌ای از ۱ تا ۴ نشانی HTTPS باشد.']);
+        $imageUrls = array_values(array_filter(array_map(static fn($value) => is_string($value) ? trim($value) : '', $imageUrls)));
+        if (count($imageUrls) < 1 || count($imageUrls) > 4) {
+            app_json(422, ['error' => 'image_urls باید شامل ۱ تا ۴ نشانی عمومی HTTPS باشد.']);
+        }
+        foreach ($imageUrls as $url) {
+            if (!ai_is_public_https_url($url)) app_json(422, ['error' => 'تمام نشانی‌های image_urls باید عمومی و HTTPS باشند.']);
+        }
+        $payload['image_urls'] = $imageUrls;
+    }
+
+    if (!empty($body['mask_url'])) {
+        $maskUrl = trim((string)$body['mask_url']);
+        if (!ai_is_public_https_url($maskUrl)) app_json(422, ['error' => 'mask_url باید یک نشانی عمومی HTTPS باشد.']);
+        $payload['mask_url'] = $maskUrl;
+    }
+
+    // Paasta documents JSON URLs, not multipart uploads, for image edits.
+    $call = ai_paasta_call($admin, 'image_edit', 'POST', '/images/edits', $payload, null, 360);
+    app_json(200, ['data' => $call['data'], 'request_id' => $call['headers']['x-paasta-request-id'] ?? null]);
 }
 
 if ($method === 'POST' && $path === '/ai/transcription') {
