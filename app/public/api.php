@@ -221,6 +221,547 @@ function ai_catalog(array $admin, string $kind): never
     app_json(200, $result['data']);
 }
 
+
+function platform_student_payload(array $row): array
+{
+    $row['id'] = (int)$row['id'];
+    $row['active'] = ($row['status'] ?? 'active') === 'active';
+    return $row;
+}
+
+function platform_question_type(string $type): string
+{
+    $allowed = ['multiple_choice','written','true_false','fill_blank','matching','ordering','listening','speaking'];
+    return in_array($type, $allowed, true) ? $type : 'multiple_choice';
+}
+
+function platform_json_value(mixed $value): ?string
+{
+    if ($value === null || $value === '') return null;
+    return json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+}
+
+if ($method === 'GET' && $path === '/platform/settings') {
+    $row = app_db()->query('SELECT api_base_url,custom_font_filename,updated_at FROM admin_ui_settings WHERE id=1')->fetch() ?: [];
+    app_json(200, [
+        'api_base_url' => $row['api_base_url'] ?? 'https://api.aiparseh.ir/api',
+        'custom_font_filename' => $row['custom_font_filename'] ?? null,
+        'font_configured' => !empty($row['custom_font_filename']),
+        'updated_at' => $row['updated_at'] ?? null,
+    ]);
+}
+
+if ($method === 'POST' && $path === '/platform/settings') {
+    $body = app_request_json();
+    $url = rtrim(trim((string)($body['api_base_url'] ?? '')), '/');
+    $parts = parse_url($url);
+    if (!$parts || strtolower((string)($parts['scheme'] ?? '')) !== 'https' || empty($parts['host']) ||
+        isset($parts['user']) || isset($parts['pass']) || strlen($url) > 500) {
+        app_json(422, ['error' => 'آدرس API باید یک URL عمومی معتبر با HTTPS باشد.']);
+    }
+    $host = strtolower((string)$parts['host']);
+    if ($host === 'localhost' || str_ends_with($host, '.local') || str_ends_with($host, '.internal')) {
+        app_json(422, ['error' => 'استفاده از میزبان محلی برای API مجاز نیست.']);
+    }
+    app_db()->prepare('UPDATE admin_ui_settings SET api_base_url=?,updated_by=? WHERE id=1')
+        ->execute([$url, (int)$admin['id']]);
+    app_json(200, ['ok' => true, 'api_base_url' => $url, 'message' => 'آدرس API ذخیره شد.']);
+}
+
+if ($method === 'POST' && $path === '/settings/font') {
+    if (empty($_FILES['font']) || !is_array($_FILES['font']) || (int)$_FILES['font']['error'] !== UPLOAD_ERR_OK) {
+        app_json(422, ['error' => 'فایل فونت را انتخاب کنید.']);
+    }
+    $file = $_FILES['font'];
+    if ((int)$file['size'] < 1024 || (int)$file['size'] > 8 * 1024 * 1024) {
+        app_json(413, ['error' => 'حجم فونت باید بین ۱ کیلوبایت تا ۸ مگابایت باشد.']);
+    }
+    $extension = strtolower(pathinfo((string)$file['name'], PATHINFO_EXTENSION));
+    $formats = ['woff2' => 'woff2', 'woff' => 'woff', 'ttf' => 'truetype', 'otf' => 'opentype'];
+    if (!isset($formats[$extension]) || !is_uploaded_file((string)$file['tmp_name'])) {
+        app_json(415, ['error' => 'فرمت مجاز فونت: WOFF2، WOFF، TTF یا OTF است.']);
+    }
+    $directory = __DIR__ . '/assets/fonts';
+    if (!is_dir($directory) && !mkdir($directory, 0750, true) && !is_dir($directory)) {
+        app_json(500, ['error' => 'ساخت پوشه فونت روی سرور ممکن نشد.']);
+    }
+    $filename = 'custom-' . bin2hex(random_bytes(12)) . '.' . $extension;
+    $target = $directory . '/' . $filename;
+    if (!move_uploaded_file((string)$file['tmp_name'], $target)) {
+        app_json(500, ['error' => 'ذخیره فونت روی سرور انجام نشد.']);
+    }
+    chmod($target, 0640);
+    $fontUrl = '/assets/fonts/' . $filename;
+    $format = $formats[$extension];
+    $css = "@font-face{font-family:'ParseCustom';src:url('" . $fontUrl . "') format('" . $format . "');font-display:swap;font-style:normal;font-weight:100 900;} :root{--font-family:'ParseCustom',Tahoma,sans-serif;} html,body,button,input,textarea,select{font-family:'ParseCustom',Tahoma,sans-serif!important;}";
+    file_put_contents(__DIR__ . '/assets/custom-font.css', $css, LOCK_EX);
+    $pdo = app_db();
+    $old = $pdo->query('SELECT custom_font_filename FROM admin_ui_settings WHERE id=1')->fetchColumn();
+    $pdo->prepare('UPDATE admin_ui_settings SET custom_font_filename=?,updated_by=? WHERE id=1')
+        ->execute([$filename, (int)$admin['id']]);
+    if (is_string($old) && $old !== '' && $old !== $filename) {
+        $oldPath = $directory . '/' . basename($old);
+        if (is_file($oldPath)) @unlink($oldPath);
+    }
+    app_json(200, ['ok' => true, 'filename' => $filename, 'message' => 'فونت پنل با موفقیت ذخیره شد.']);
+}
+
+if ($method === 'GET' && $path === '/platform/overview') {
+    $pdo = app_db();
+    $students = (int)$pdo->query('SELECT COUNT(*) FROM students')->fetchColumn();
+    $activeStudents = (int)$pdo->query("SELECT COUNT(*) FROM students WHERE status='active'")->fetchColumn();
+    $onlineStudents = (int)$pdo->query('SELECT COUNT(*) FROM students WHERE last_seen_at >= (UTC_TIMESTAMP() - INTERVAL 5 MINUTE)')->fetchColumn();
+    $resources = (int)$pdo->query('SELECT COUNT(*) FROM learning_resources')->fetchColumn();
+    $questions = (int)$pdo->query('SELECT COUNT(*) FROM question_bank')->fetchColumn();
+    $exams = (int)$pdo->query('SELECT COUNT(*) FROM exams')->fetchColumn();
+    $attempts = (int)$pdo->query('SELECT COUNT(*) FROM exam_attempts')->fetchColumn();
+    $submitted = (int)$pdo->query("SELECT COUNT(*) FROM exam_attempts WHERE status IN ('submitted','reviewed')")->fetchColumn();
+    app_json(200, compact('students','activeStudents','onlineStudents','resources','questions','exams','attempts','submitted'));
+}
+
+if ($method === 'GET' && $path === '/platform/students') {
+    $q = trim((string)($_GET['q'] ?? ''));
+    $status = trim((string)($_GET['status'] ?? ''));
+    $limit = min(200, max(1, (int)($_GET['limit'] ?? 100)));
+    $offset = max(0, min(1000000, (int)($_GET['offset'] ?? 0)));
+    $where = [];
+    $params = [];
+    if ($q !== '') {
+        $where[] = '(username LIKE ? OR name LIKE ? OR phone LIKE ? OR student_code LIKE ? OR email LIKE ?)';
+        $term = '%' . $q . '%';
+        array_push($params, $term, $term, $term, $term, $term);
+    }
+    if (in_array($status, ['active','disabled','pending'], true)) {
+        $where[] = 'status=?'; $params[] = $status;
+    }
+    $sqlWhere = $where ? ' WHERE ' . implode(' AND ', $where) : '';
+    $stmt = app_db()->prepare(
+        'SELECT id,username,student_code,phone,name,email,status,level,group_name,last_seen_at,last_seen_platform,created_at
+         FROM students' . $sqlWhere . ' ORDER BY id DESC LIMIT ? OFFSET ?'
+    );
+    foreach ($params as $i => $value) $stmt->bindValue($i + 1, $value);
+    $stmt->bindValue(count($params) + 1, $limit, PDO::PARAM_INT);
+    $stmt->bindValue(count($params) + 2, $offset, PDO::PARAM_INT);
+    $stmt->execute();
+    app_json(200, ['rows' => $stmt->fetchAll(), 'limit' => $limit, 'offset' => $offset]);
+}
+
+if ($method === 'POST' && $path === '/platform/students') {
+    $body = app_request_json();
+    $username = trim((string)($body['username'] ?? ''));
+    $name = trim((string)($body['name'] ?? ''));
+    $password = (string)($body['password'] ?? '');
+    $phone = trim((string)($body['phone'] ?? ''));
+    $code = trim((string)($body['student_code'] ?? ''));
+    if (!preg_match('/^[a-zA-Z0-9_.-]{3,100}$/', $username) || $name === '' ||
+        strlen($password) < 8 || mb_strlen($name) > 200) {
+        app_json(422, ['error' => 'نام، نام کاربری معتبر و رمز عبور حداقل ۸ کاراکتری الزامی است.']);
+    }
+    try {
+        $stmt = app_db()->prepare(
+            'INSERT INTO students(username,student_code,phone,name,email,password_hash,status,level,group_name)
+             VALUES(?,?,?,?,?,?,?, ?,?)'
+        );
+        $stmt->execute([
+            $username, $code !== '' ? $code : null, $phone !== '' ? $phone : null, $name,
+            trim((string)($body['email'] ?? '')) ?: null, password_hash($password, PASSWORD_DEFAULT),
+            in_array(($body['status'] ?? 'active'), ['active','disabled','pending'], true) ? $body['status'] : 'active',
+            trim((string)($body['level'] ?? '')) ?: null, trim((string)($body['group_name'] ?? '')) ?: null
+        ]);
+    } catch (PDOException $e) {
+        if ((string)$e->getCode() === '23000') app_json(409, ['error' => 'نام کاربری، کد دانش‌آموزی یا شماره تماس تکراری است.']);
+        throw $e;
+    }
+    $id = (int)app_db()->lastInsertId();
+    $audit = app_db()->prepare('INSERT INTO admin_audit_log(admin_user_id,action,target_type,target_id,ip_address) VALUES(?,?,?,?,?)');
+    $audit->execute([(int)$admin['id'],'student.create','student',$id,substr((string)($_SERVER['REMOTE_ADDR'] ?? ''),0,45)]);
+    app_json(201, ['ok' => true, 'id' => $id]);
+}
+
+if ($method === 'POST' && preg_match('#^/platform/students/([1-9][0-9]*)/status$#', $path, $m)) {
+    $id = (int)$m[1]; $body = app_request_json();
+    $status = (string)($body['status'] ?? '');
+    if (!in_array($status, ['active','disabled','pending'], true)) app_json(422, ['error' => 'وضعیت انتخاب‌شده معتبر نیست.']);
+    app_db()->prepare('UPDATE students SET status=? WHERE id=?')->execute([$status,$id]);
+    if ($status !== 'active') app_db()->prepare('DELETE FROM student_auth_tokens WHERE student_id=?')->execute([$id]);
+    app_json(200, ['ok' => true, 'status' => $status]);
+}
+
+if ($method === 'POST' && preg_match('#^/platform/students/([1-9][0-9]*)/password$#', $path, $m)) {
+    $id = (int)$m[1]; $body = app_request_json(); $password = (string)($body['password'] ?? '');
+    if (strlen($password) < 8) app_json(422, ['error' => 'رمز عبور باید حداقل ۸ کاراکتر باشد.']);
+    $stmt = app_db()->prepare('UPDATE students SET password_hash=? WHERE id=?');
+    $stmt->execute([password_hash($password, PASSWORD_DEFAULT),$id]);
+    if ($stmt->rowCount() < 1) app_json(404, ['error' => 'دانش‌آموز پیدا نشد.']);
+    app_db()->prepare('DELETE FROM student_auth_tokens WHERE student_id=?')->execute([$id]);
+    app_json(200, ['ok' => true, 'message' => 'رمز دانش‌آموز تغییر کرد و نشست‌های قبلی باطل شدند.']);
+}
+
+if ($method === 'POST' && preg_match('#^/platform/students/([1-9][0-9]*)$#', $path, $m)) {
+    $id = (int)$m[1]; $body = app_request_json();
+    $allowed = ['name','phone','email','student_code','level','group_name'];
+    $sets = []; $values = [];
+    foreach ($allowed as $field) {
+        if (array_key_exists($field, $body)) {
+            $sets[] = $field . '=?';
+            $values[] = trim((string)$body[$field]) !== '' ? trim((string)$body[$field]) : null;
+        }
+    }
+    if (!$sets) app_json(422, ['error' => 'هیچ فیلد قابل تغییری ارسال نشده است.']);
+    $values[] = $id;
+    app_db()->prepare('UPDATE students SET ' . implode(',', $sets) . ' WHERE id=?')->execute($values);
+    app_json(200, ['ok' => true]);
+}
+
+if ($method === 'GET' && $path === '/platform/resources') {
+    $rows = app_db()->query(
+        'SELECT id,resource_type,title,description,subject,level,content_text,file_url,original_filename,published,created_at,updated_at
+         FROM learning_resources ORDER BY id DESC'
+    )->fetchAll();
+    app_json(200, ['rows' => $rows]);
+}
+
+if ($method === 'POST' && $path === '/platform/resources') {
+    $isUpload = isset($_FILES['resource_file']) && (int)($_FILES['resource_file']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK;
+    $body = $isUpload ? $_POST : app_request_json();
+    $type = (string)($body['resource_type'] ?? 'handout');
+    if (!in_array($type, ['book','handout','lesson','course','source'], true)) $type = 'handout';
+    $title = trim((string)($body['title'] ?? ''));
+    if ($title === '' || mb_strlen($title) > 255) app_json(422, ['error' => 'عنوان منبع آموزشی الزامی است.']);
+    $content = trim((string)($body['content_text'] ?? ''));
+    $fileUrl = trim((string)($body['file_url'] ?? '')) ?: null;
+    $storedPath = null; $originalName = null;
+    if ($isUpload) {
+        $file = $_FILES['resource_file'];
+        if ((int)$file['size'] > 20 * 1024 * 1024) app_json(413, ['error' => 'حداکثر حجم فایل ۲۰ مگابایت است.']);
+        $extension = strtolower(pathinfo((string)$file['name'], PATHINFO_EXTENSION));
+        if (!in_array($extension, ['txt','md','pdf'], true) || !is_uploaded_file((string)$file['tmp_name'])) {
+            app_json(415, ['error' => 'فرمت مجاز فایل: TXT، MD یا PDF است.']);
+        }
+        $storage = '/var/lib/parse-admin/resources';
+        if (!is_dir($storage) && !mkdir($storage, 0750, true) && !is_dir($storage)) app_json(500, ['error' => 'پوشه منابع روی سرور ساخته نشد.']);
+        $safeName = bin2hex(random_bytes(16)) . '.' . $extension;
+        $storedPath = $storage . '/' . $safeName;
+        if (!move_uploaded_file((string)$file['tmp_name'], $storedPath)) app_json(500, ['error' => 'ذخیره فایل روی سرور انجام نشد.']);
+        chmod($storedPath, 0640);
+        $originalName = basename((string)$file['name']);
+        if (in_array($extension, ['txt','md'], true)) {
+            $rawText = file_get_contents($storedPath);
+            if (!is_string($rawText) || !mb_check_encoding($rawText, 'UTF-8')) app_json(422, ['error' => 'فایل متنی باید با UTF-8 ذخیره شده باشد.']);
+            $content = mb_substr($rawText, 0, 600000);
+        }
+        $fileUrl = '/api/resources/0/download';
+    }
+    $stmt = app_db()->prepare(
+        'INSERT INTO learning_resources(resource_type,title,description,subject,level,content_text,file_url,storage_path,original_filename,published,created_by)
+         VALUES(?,?,?,?,?,?,?,?,?,?,?)'
+    );
+    $stmt->execute([
+        $type,$title,trim((string)($body['description'] ?? '')) ?: null,
+        trim((string)($body['subject'] ?? '')) ?: null,
+        trim((string)($body['level'] ?? '')) ?: null,
+        $content !== '' ? $content : null,$fileUrl,$storedPath,$originalName,
+        !empty($body['published']) ? 1 : 0,(int)$admin['id']
+    ]);
+    $id = (int)app_db()->lastInsertId();
+    if ($storedPath) {
+        app_db()->prepare('UPDATE learning_resources SET file_url=? WHERE id=?')->execute(['/api/resources/'.$id.'/download',$id]);
+    }
+    app_json(201, ['ok' => true, 'id' => $id, 'file_url' => $storedPath ? '/api/resources/'.$id.'/download' : $fileUrl]);
+}
+
+if ($method === 'POST' && preg_match('#^/platform/resources/([1-9][0-9]*)/publish$#', $path, $m)) {
+    $id = (int)$m[1]; $body = app_request_json();
+    $published = !empty($body['published']) ? 1 : 0;
+    app_db()->prepare('UPDATE learning_resources SET published=? WHERE id=?')->execute([$published,$id]);
+    app_json(200, ['ok' => true, 'published' => (bool)$published]);
+}
+
+if ($method === 'DELETE' && preg_match('#^/platform/resources/([1-9][0-9]*)$#', $path, $m)) {
+    $id = (int)$m[1];
+    $stmt = app_db()->prepare('SELECT storage_path FROM learning_resources WHERE id=?');
+    $stmt->execute([$id]); $stored = $stmt->fetchColumn();
+    app_db()->prepare('DELETE FROM learning_resources WHERE id=?')->execute([$id]);
+    if (is_string($stored) && str_starts_with($stored, '/var/lib/parse-admin/resources/') && is_file($stored)) @unlink($stored);
+    app_json(200, ['deleted' => 1]);
+}
+
+if ($method === 'GET' && $path === '/platform/questions') {
+    $q = trim((string)($_GET['q'] ?? ''));
+    $limit = min(200, max(1, (int)($_GET['limit'] ?? 100)));
+    $stmt = app_db()->prepare(
+        'SELECT q.id,q.resource_id,q.target_student_id,s.name AS student_name,q.subject,q.level,q.skill,q.question_type,
+                q.question_text,q.options_json,q.answer_json,q.explanation,q.difficulty,q.points,q.status,q.created_at
+         FROM question_bank q LEFT JOIN students s ON s.id=q.target_student_id
+         WHERE (?=\\'\\' OR q.question_text LIKE ? OR q.subject LIKE ?)
+         ORDER BY q.id DESC LIMIT ?'
+    );
+    $term = '%' . $q . '%';
+    $stmt->bindValue(1,$q); $stmt->bindValue(2,$term); $stmt->bindValue(3,$term); $stmt->bindValue(4,$limit,PDO::PARAM_INT);
+    $stmt->execute();
+    app_json(200, ['rows' => $stmt->fetchAll()]);
+}
+
+if ($method === 'POST' && $path === '/platform/questions') {
+    $body = app_request_json();
+    $items = $body['questions'] ?? [$body];
+    if (!is_array($items) || count($items) < 1 || count($items) > 100) app_json(422, ['error' => 'بین ۱ تا ۱۰۰ سؤال ارسال کنید.']);
+    $subject = trim((string)($body['subject'] ?? 'عمومی'));
+    $resourceId = !empty($body['resource_id']) ? (int)$body['resource_id'] : null;
+    $studentId = !empty($body['target_student_id']) ? (int)$body['target_student_id'] : null;
+    $skill = in_array(($body['skill'] ?? 'general'), ['listening','speaking','reading','writing','grammar','vocabulary','general'], true) ? $body['skill'] : 'general';
+    $pdo = app_db(); $pdo->beginTransaction(); $saved = [];
+    try {
+        foreach ($items as $item) {
+            if (!is_array($item) || trim((string)($item['question_text'] ?? '')) === '') continue;
+            $qType = platform_question_type((string)($item['question_type'] ?? $body['question_type'] ?? 'multiple_choice'));
+            $options = $item['options'] ?? null;
+            if ($qType === 'multiple_choice') {
+                if (!is_array($options) || count($options) < 2) throw new InvalidArgumentException('برای سؤال چندگزینه‌ای حداقل دو گزینه لازم است.');
+            } else {
+                $options = is_array($options) ? $options : null;
+            }
+            $difficulty = in_array(($item['difficulty'] ?? $body['difficulty'] ?? 'medium'), ['easy','medium','hard'], true)
+                ? ($item['difficulty'] ?? $body['difficulty'] ?? 'medium') : 'medium';
+            $stmt = $pdo->prepare(
+                'INSERT INTO question_bank(resource_id,target_student_id,subject,level,skill,question_type,question_text,options_json,answer_json,explanation,difficulty,points,tags_json,status,created_by)
+                 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+            );
+            $stmt->execute([
+                $resourceId,$studentId,$subject,
+                trim((string)($item['level'] ?? $body['level'] ?? '')) ?: null,$skill,$qType,
+                trim((string)$item['question_text']),platform_json_value($options),
+                platform_json_value($item['correct_answer'] ?? $item['answer'] ?? null),
+                trim((string)($item['explanation'] ?? '')) ?: null,$difficulty,
+                max(0.25,min(100,(float)($item['points'] ?? 1))),
+                platform_json_value($item['tags'] ?? []),$body['status'] ?? 'draft',(int)$admin['id']
+            ]);
+            $saved[] = (int)$pdo->lastInsertId();
+        }
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        if ($e instanceof InvalidArgumentException) app_json(422, ['error' => $e->getMessage()]);
+        throw $e;
+    }
+    app_json(201, ['saved' => count($saved), 'ids' => $saved]);
+}
+
+if ($method === 'POST' && $path === '/platform/questions/generate') {
+    $body = app_request_json();
+    $model = trim((string)($body['model'] ?? ''));
+    $resourceId = (int)($body['resource_id'] ?? 0);
+    $count = min(40, max(1, (int)($body['count'] ?? 10)));
+    $qType = platform_question_type((string)($body['question_type'] ?? 'multiple_choice'));
+    $subject = trim((string)($body['subject'] ?? 'عمومی'));
+    $level = trim((string)($body['level'] ?? ''));
+    $targetStudentId = !empty($body['target_student_id']) ? (int)$body['target_student_id'] : null;
+    if ($model === '' || $resourceId < 1) app_json(422, ['error' => 'مدل و فایل منبع آموزشی را انتخاب کنید.']);
+    $sourceStmt = app_db()->prepare('SELECT id,title,content_text FROM learning_resources WHERE id=? LIMIT 1');
+    $sourceStmt->execute([$resourceId]); $source = $sourceStmt->fetch();
+    if (!$source || trim((string)$source['content_text']) === '') app_json(422, ['error' => 'منبع انتخابی متن قابل پردازش ندارد؛ برای تولید AI فایل TXT یا MD بارگذاری کنید.']);
+    $sourceText = mb_substr((string)$source['content_text'],0,60000);
+    $typeRules = [
+      'multiple_choice' => 'هر سؤال دقیقاً چهار گزینه مستقل با شناسه‌های A,B,C,D داشته باشد؛ correct_answer فقط شناسه گزینه صحیح باشد.',
+      'written' => 'سؤال تشریحی باشد؛ options آرایه خالی و correct_answer پاسخ نمونه با معیار نمره‌دهی باشد.',
+      'true_false' => 'گزاره درست/نادرست باشد؛ options شامل درست و نادرست و correct_answer یکی از همین دو مقدار باشد.',
+      'fill_blank' => 'جای خالی در جمله قرار بده؛ options خالی و correct_answer متن کوتاه پاسخ باشد.',
+      'matching' => 'دو ستون همتاسازی بساز؛ options شامل left و right و correct_answer آرایه تطبیق‌ها باشد.',
+      'ordering' => 'مراحل را به‌هم‌ریخته نمایش بده؛ options آرایه آیتم‌ها و correct_answer ترتیب صحیح شناسه‌ها باشد.',
+      'listening' => 'سؤال مهارت شنیداری و متناسب با متن منبع باشد؛ برای صوت، متن محرک و دستور اجرا را در question_text مشخص کن.',
+      'speaking' => 'پرسش گفتاری و معیارهای ارزیابی را در explanation بنویس؛ options خالی باشد.'
+    ];
+    $prompt = "از محتوای منبع زیر فقط سؤال آموزشی بساز. موضوع: {$subject}. سطح: {$level}. دشواری: ".(string)($body['difficulty'] ?? 'medium').". نوع: {$qType}. تعداد: {$count}. مهارت: ".(string)($body['skill'] ?? 'general').".\n"
+      .$typeRules[$qType]."\n"
+      ."فقط JSON معتبر و بدون Markdown برگردان با ساختار {\\\"questions\\\":[{\\\"question_text\\\":\\\"...\\\",\\\"question_type\\\":\\\"{$qType}\\\",\\\"options\\\":[],\\\"correct_answer\\\":\\\"...\\\",\\\"explanation\\\":\\\"...\\\",\\\"difficulty\\\":\\\"easy|medium|hard\\\",\\\"points\\\":1}]}. متن سؤال و گزینه‌ها را فارسی و روشن بنویس. هیچ دانسته‌ای خارج از منبع را به منبع نسبت نده.\\n\\nمنبع: ".$sourceText;
+    $system = 'You are an expert assessment designer. Return valid JSON only. Follow the requested question type exactly. Never add Markdown fences.';
+    $call = ai_paasta_call($admin,'structured_question_generation','POST','/chat/completions',[
+      'model'=>$model,'messages'=>[['role'=>'system','content'=>$system],['role'=>'user','content'=>$prompt]],
+      'max_tokens'=>min(8192,max(1200,$count*500)),'temperature'=>0.35,
+      'response_format'=>['type'=>'json_object']
+    ],null,240);
+    $output = ai_extract_text($call['data']);
+    $decoded = json_decode($output,true);
+    if (!is_array($decoded)) {
+        $start = strpos($output,'{'); $end = strrpos($output,'}');
+        if ($start !== false && $end > $start) $decoded = json_decode(substr($output,$start,$end-$start+1),true);
+    }
+    $items = is_array($decoded) ? ($decoded['questions'] ?? $decoded) : null;
+    if (!is_array($items)) app_json(502,['error'=>'خروجی مدل JSON معتبر برای بانک سؤال نبود.','raw_output'=>mb_substr($output,0,4000)]);
+    $saveBody = [
+      'questions'=>array_slice($items,0,$count),'subject'=>$subject,'level'=>$level,
+      'skill'=>$body['skill'] ?? 'general','resource_id'=>$resourceId,'target_student_id'=>$targetStudentId,'status'=>'draft'
+    ];
+    // Save with the same validation path used for manually authored questions.
+    $fake = $saveBody;
+    $pdo = app_db(); $pdo->beginTransaction(); $saved = [];
+    try {
+      foreach ($fake['questions'] as $item) {
+        if (!is_array($item) || trim((string)($item['question_text'] ?? '')) === '') continue;
+        $itemType = platform_question_type((string)($item['question_type'] ?? $qType));
+        $options = $item['options'] ?? null;
+        if ($itemType === 'multiple_choice' && (!is_array($options) || count($options) !== 4)) {
+          throw new InvalidArgumentException('مدل برای سؤال چندگزینه‌ای دقیقاً چهار گزینه تولید نکرد.');
+        }
+        $stmt=$pdo->prepare('INSERT INTO question_bank(resource_id,target_student_id,subject,level,skill,question_type,question_text,options_json,answer_json,explanation,difficulty,points,tags_json,status,created_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
+        $stmt->execute([
+          $resourceId,$targetStudentId,$subject,$level,
+          in_array(($body['skill'] ?? 'general'),['listening','speaking','reading','writing','grammar','vocabulary','general'],true)?$body['skill']:'general',
+          $itemType,trim((string)$item['question_text']),platform_json_value($options),
+          platform_json_value($item['correct_answer'] ?? null),trim((string)($item['explanation'] ?? '')) ?: null,
+          in_array(($item['difficulty'] ?? ''),['easy','medium','hard'],true)?$item['difficulty']:'medium',
+          max(0.25,min(100,(float)($item['points'] ?? 1))),platform_json_value($item['tags'] ?? []),'draft',(int)$admin['id']
+        ]);
+        $saved[] = (int)$pdo->lastInsertId();
+      }
+      $pdo->commit();
+    } catch (Throwable $e) {
+      if ($pdo->inTransaction()) $pdo->rollBack();
+      if ($e instanceof InvalidArgumentException) app_json(502,['error'=>$e->getMessage(),'raw_output'=>mb_substr($output,0,4000)]);
+      throw $e;
+    }
+    app_json(200,['saved'=>count($saved),'ids'=>$saved,'questions'=>$items,'output'=>$output,'request_id'=>$call['headers']['x-paasta-request-id']??null]);
+}
+
+if ($method === 'POST' && preg_match('#^/platform/questions/([1-9][0-9]*)/status$#', $path, $m)) {
+    $id=(int)$m[1];$body=app_request_json();$status=(string)($body['status']??'');
+    if(!in_array($status,['draft','published','archived'],true))app_json(422,['error'=>'وضعیت سؤال معتبر نیست.']);
+    app_db()->prepare('UPDATE question_bank SET status=? WHERE id=?')->execute([$status,$id]);
+    app_json(200,['ok'=>true,'status'=>$status]);
+}
+
+if ($method === 'DELETE' && preg_match('#^/platform/questions/([1-9][0-9]*)$#', $path, $m)) {
+    app_db()->prepare('DELETE FROM question_bank WHERE id=?')->execute([(int)$m[1]]);
+    app_json(200,['deleted'=>1]);
+}
+
+if ($method === 'GET' && $path === '/platform/exams') {
+    $rows=app_db()->query(
+      'SELECT e.id,e.title,e.subject,e.level,e.duration_minutes,e.starts_at,e.ends_at,e.status,e.passing_score,
+              s.name AS student_name,COUNT(eq.question_id) AS question_count,COUNT(a.id) AS attempt_count
+       FROM exams e LEFT JOIN students s ON s.id=e.target_student_id
+       LEFT JOIN exam_questions eq ON eq.exam_id=e.id
+       LEFT JOIN exam_attempts a ON a.exam_id=e.id
+       GROUP BY e.id ORDER BY e.id DESC'
+    )->fetchAll();
+    app_json(200,['rows'=>$rows]);
+}
+
+if ($method === 'POST' && $path === '/platform/exams') {
+    $body=app_request_json();
+    $title=trim((string)($body['title']??''));
+    $questionIds=array_values(array_unique(array_filter(array_map('intval',(array)($body['question_ids']??[])),static fn($id)=>$id>0)));
+    $duration=min(600,max(1,(int)($body['duration_minutes']??30)));
+    if($title===''||count($questionIds)<1||count($questionIds)>200)app_json(422,['error'=>'عنوان آزمون و حداقل یک سؤال از بانک سؤال الزامی است.']);
+    $start=trim((string)($body['starts_at']??''))?:null;$end=trim((string)($body['ends_at']??''))?:null;
+    if($start!==null&&$end!==null&&strtotime($end)<=strtotime($start))app_json(422,['error'=>'زمان پایان باید بعد از زمان شروع باشد.']);
+    $status=in_array(($body['status']??'draft'),['draft','published','closed'],true)?$body['status']:'draft';
+    $pdo=app_db();$pdo->beginTransaction();
+    try{
+      $pdo->prepare('INSERT INTO exams(title,description,subject,level,duration_minutes,starts_at,ends_at,target_student_id,shuffle_questions,shuffle_options,show_result,passing_score,status,created_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+        ->execute([$title,trim((string)($body['description']??''))?:null,trim((string)($body['subject']??''))?:null,trim((string)($body['level']??''))?:null,$duration,$start,$end,!empty($body['target_student_id'])?(int)$body['target_student_id']:null,!empty($body['shuffle_questions'])?1:0,!empty($body['shuffle_options'])?1:0,!empty($body['show_result'])?1:0,max(0,min(100,(float)($body['passing_score']??50))),$status,(int)$admin['id']]);
+      $examId=(int)$pdo->lastInsertId();
+      $validStmt=$pdo->prepare('SELECT id FROM question_bank WHERE id=?');
+      $link=$pdo->prepare('INSERT INTO exam_questions(exam_id,question_id,position,points) VALUES(?,?,?,?)');
+      foreach($questionIds as $position=>$qid){
+        $validStmt->execute([$qid]);if(!$validStmt->fetchColumn())throw new InvalidArgumentException('یکی از سؤال‌های انتخاب‌شده در بانک سؤال وجود ندارد.');
+        $link->execute([$examId,$qid,$position+1,max(0.25,(float)($body['points'][$qid]??1))]);
+      }
+      $pdo->commit();
+    }catch(Throwable $e){
+      if($pdo->inTransaction())$pdo->rollBack();
+      if($e instanceof InvalidArgumentException)app_json(422,['error'=>$e->getMessage()]);
+      throw $e;
+    }
+    app_json(201,['ok'=>true,'id'=>$examId]);
+}
+
+if ($method === 'POST' && preg_match('#^/platform/exams/([1-9][0-9]*)/status$#',$path,$m)) {
+    $id=(int)$m[1];$body=app_request_json();$status=(string)($body['status']??'');
+    if(!in_array($status,['draft','published','closed'],true))app_json(422,['error'=>'وضعیت آزمون معتبر نیست.']);
+    app_db()->prepare('UPDATE exams SET status=? WHERE id=?')->execute([$status,$id]);
+    app_json(200,['ok'=>true]);
+}
+
+if ($method === 'GET' && $path === '/platform/attempts') {
+    $rows=app_db()->query(
+      'SELECT a.id,a.exam_id,a.student_id,a.started_at,a.expires_at,a.submitted_at,a.score,a.total_points,a.status,
+              e.title AS exam_title,s.name AS student_name,s.username,
+              (SELECT COUNT(*) FROM exam_answers ans WHERE ans.attempt_id=a.id) AS answered_count,
+              (SELECT COUNT(*) FROM exam_questions eq WHERE eq.exam_id=a.exam_id) AS question_count,
+              (SELECT COUNT(*) FROM exam_answers ans WHERE ans.attempt_id=a.id AND ans.is_correct IS NULL) AS pending_review
+       FROM exam_attempts a INNER JOIN exams e ON e.id=a.exam_id INNER JOIN students s ON s.id=a.student_id
+       ORDER BY a.id DESC LIMIT 500'
+    )->fetchAll();
+    app_json(200,['rows'=>$rows]);
+}
+
+if ($method === 'GET' && preg_match('#^/platform/attempts/([1-9][0-9]*)$#',$path,$m)) {
+    $id=(int)$m[1];
+    $head=app_db()->prepare(
+      'SELECT a.*,e.title AS exam_title,s.name AS student_name,s.username
+       FROM exam_attempts a JOIN exams e ON e.id=a.exam_id JOIN students s ON s.id=a.student_id WHERE a.id=?'
+    );
+    $head->execute([$id]);$attempt=$head->fetch();if(!$attempt)app_json(404,['error'=>'پاسخ‌نامه پیدا نشد.']);
+    $answers=app_db()->prepare(
+      'SELECT q.id AS question_id,q.question_text,q.question_type,q.options_json,q.answer_json AS correct_answer,
+              a.answer_json AS student_answer,a.is_correct,a.awarded_points,a.teacher_feedback,eq.points
+       FROM exam_answers a JOIN question_bank q ON q.id=a.question_id
+       JOIN exam_questions eq ON eq.exam_id=? AND eq.question_id=q.id
+       WHERE a.attempt_id=? ORDER BY eq.position'
+    );
+    $answers->execute([(int)$attempt['exam_id'],$id]);
+    app_json(200,['attempt'=>$attempt,'answers'=>$answers->fetchAll()]);
+}
+
+if ($method === 'POST' && preg_match('#^/platform/answers/([1-9][0-9]*)/grade$#',$path,$m)) {
+    $answerId=(int)$m[1];$body=app_request_json();
+    $points=max(0,(float)($body['awarded_points']??0));
+    $feedback=trim((string)($body['teacher_feedback']??''));
+    $pdo=app_db();$stmt=$pdo->prepare('SELECT attempt_id,question_id FROM exam_answers WHERE id=?');$stmt->execute([$answerId]);$answer=$stmt->fetch();
+    if(!$answer)app_json(404,['error'=>'پاسخ پیدا نشد.']);
+    $maxStmt=$pdo->prepare('SELECT points,exam_id FROM exam_questions WHERE question_id=? AND exam_id=(SELECT exam_id FROM exam_attempts WHERE id=?)');
+    $maxStmt->execute([(int)$answer['question_id'],(int)$answer['attempt_id']]);$max=$maxStmt->fetch();
+    if(!$max||$points>(float)$max['points'])app_json(422,['error'=>'نمره واردشده از بارم سؤال بیشتر است.']);
+    $pdo->prepare('UPDATE exam_answers SET is_correct=NULL,awarded_points=?,teacher_feedback=? WHERE id=?')->execute([$points,$feedback?:null,$answerId]);
+    $sum=$pdo->prepare('SELECT COALESCE(SUM(awarded_points),0) score FROM exam_answers WHERE attempt_id=?');
+    $sum->execute([(int)$answer['attempt_id']]);$score=(float)$sum->fetchColumn();
+    $total=$pdo->prepare('SELECT COALESCE(SUM(points),0) FROM exam_questions WHERE exam_id=?');$total->execute([(int)$max['exam_id']]);$totalPoints=(float)$total->fetchColumn();
+    $pdo->prepare("UPDATE exam_attempts SET score=?,total_points=?,status='reviewed' WHERE id=?")->execute([$score,$totalPoints,(int)$answer['attempt_id']]);
+    app_json(200,['ok'=>true,'score'=>$score,'total_points'=>$totalPoints]);
+}
+
+if ($method === 'GET' && $path === '/platform/monitoring') {
+    $pdo=app_db();
+    $online=$pdo->query(
+      'SELECT id,username,name,level,group_name,last_seen_at,last_seen_platform
+       FROM students WHERE last_seen_at >= (UTC_TIMESTAMP() - INTERVAL 5 MINUTE)
+       ORDER BY last_seen_at DESC LIMIT 100'
+    )->fetchAll();
+    $events=$pdo->query(
+      'SELECT e.id,e.student_id,s.name AS student_name,e.event_type,e.route,e.platform,e.created_at
+       FROM student_activity_events e JOIN students s ON s.id=e.student_id
+       ORDER BY e.id DESC LIMIT 100'
+    )->fetchAll();
+    app_json(200,['online'=>$online,'events'=>$events]);
+}
+
+if ($method === 'GET' && preg_match('#^/resources/([1-9][0-9]*)/download$#',$path,$m)) {
+    $student=parse_require_student($pdo);$id=(int)$m[1];
+    $stmt=$pdo->prepare('SELECT storage_path,original_filename,published FROM learning_resources WHERE id=?');
+    $stmt->execute([$id]);$file=$stmt->fetch();
+    if(!$file||!(bool)$file['published']||!is_string($file['storage_path'])||!is_file($file['storage_path']))respond(404,['message'=>'فایل در دسترس نیست.']);
+    parse_store_event($pdo,(int)$student['id'],'resource.download','/resources/'.$id,['resource_id'=>$id]);
+    $name=preg_replace('/[^a-zA-Z0-9._-]/','_', (string)$file['original_filename']) ?: 'resource';
+    header('Content-Type: application/octet-stream');
+    header('Content-Length: '.filesize($file['storage_path']));
+    header('Content-Disposition: attachment; filename="'.$name.'"');
+    header('X-Content-Type-Options: nosniff');
+    readfile($file['storage_path']);
+    exit;
+}
+
+
 if ($method === 'GET' && $path === '/bootstrap') {
     $stmt = app_db()->query('SELECT default_model,api_key_ciphertext,updated_at FROM ai_provider_settings WHERE id=1');
     $settings = $stmt->fetch() ?: [];
