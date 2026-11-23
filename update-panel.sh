@@ -115,6 +115,7 @@ server {
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_session_cache shared:ParseAdminSSL:10m;
     ssl_session_timeout 1d;
+    add_header Strict-Transport-Security "max-age=15552000" always;
 
     add_header X-Content-Type-Options nosniff always;
     add_header Referrer-Policy strict-origin-when-cross-origin always;
