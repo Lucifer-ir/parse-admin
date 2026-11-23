@@ -59,15 +59,8 @@ php -l "$INSTALL_DIR/backend/bin/create-admin.php"
 bash -n "$INSTALL_DIR/install.sh"
 bash -n "$INSTALL_DIR/backend/bin/backup-db.sh"
 
-echo "[3/9] Publishing the static admin panel..."
-install -d -m 0755 "$WEB_ROOT"
-find "$WEB_ROOT" -mindepth 1 -maxdepth 1 ! -name index.html ! -name assets ! -name .well-known -exec rm -rf {} +
-install -m 0644 "$INSTALL_DIR/index.html" "$WEB_ROOT/index.html"
-install -d -m 0755 "$WEB_ROOT/assets"
-rsync -a --delete "$INSTALL_DIR/assets/" "$WEB_ROOT/assets/"
-chown -R www-data:www-data "$WEB_ROOT"
-find "$WEB_ROOT" -type d -exec chmod 755 {} \;
-find "$WEB_ROOT" -type f -exec chmod 644 {} \;
+echo "[3/9] Deferring panel deployment until the backend and database are ready..."
+# The PHP-FPM panel is deployed by update-panel.sh after the DB, secrets and API host exist.
 
 echo "[4/9] Preparing MySQL database and restricted application user..."
 DB_NAME="parse_admin"
