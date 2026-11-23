@@ -96,6 +96,7 @@ $assetVersion = max(
 <meta name="csrf-token" content="<?= app_e($csrf) ?>">
 <title><?= $admin ? 'کنسول مدیریت Parse' : 'ورود مدیر | Parse Admin' ?></title>
 <link rel="stylesheet" href="/assets/admin.css?v=<?= app_e((string)$assetVersion) ?>">
+<?php if (is_file(__DIR__ . '/assets/custom-font.css')): ?><link rel="stylesheet" href="/assets/custom-font.css?v=<?= (int)filemtime(__DIR__ . '/assets/custom-font.css') ?>"><?php endif; ?>
 </head>
 <body class="<?= $admin ? 'app-page' : 'login-page' ?>">
 <?php if (!$admin): ?>
@@ -152,8 +153,14 @@ $assetVersion = max(
       <button class="nav-item" data-page="usage"><i>◷</i><span>مصرف و هزینه‌ها</span></button>
       <button class="nav-item" data-page="history"><i>▧</i><span>تاریخچه تولید</span></button>
       <div class="nav-caption">مدیریت محتوا و کاربران</div>
-      <button class="nav-item" data-page="question-bank"><i>▤</i><span>بانک سؤال‌ها</span></button>
-      <button class="nav-item" data-page="users"><i>♙</i><span>مدیریت کاربران</span></button>
+      <button class="nav-item" data-page="question-bank"><i>▤</i><span>بانک هوشمند سؤال</span></button>
+      <button class="nav-item" data-page="users"><i>♙</i><span>مدیریت مدیران</span></button>
+      <div class="nav-caption">اپلیکیشن Parse</div>
+      <button class="nav-item" data-page="students"><i>♙</i><span>دانش‌آموزان</span></button>
+      <button class="nav-item" data-page="resources"><i>▣</i><span>کتاب‌ها و جزوه‌ها</span></button>
+      <button class="nav-item" data-page="exams"><i>◷</i><span>آزمون‌ها و زمان‌بندی</span></button>
+      <button class="nav-item" data-page="attempts"><i>✓</i><span>پاسخ‌نامه‌ها و نمرات</span></button>
+      <button class="nav-item" data-page="monitoring"><i>⌁</i><span>مانیتورینگ اپ</span></button>
       <button class="nav-item" data-page="prompts"><i>✎</i><span>قالب‌های دستور AI</span></button>
       <button class="nav-item" data-page="settings"><i>⚙</i><span>تنظیمات اتصال</span></button>
     </nav>
@@ -255,10 +262,23 @@ $assetVersion = max(
     </section>
 
     <section class="page-view" id="page-question-bank">
-      <div class="page-heading"><div><div class="eyebrow">CONTENT MANAGEMENT</div><h1>بانک سؤال‌ها</h1><p>جست‌وجو و مدیریت سؤال‌های ذخیره‌شده از تولید هوش مصنوعی.</p></div><button class="button button-ghost" id="refreshQuestionBank">↻ به‌روزرسانی</button></div>
+      <div class="page-heading"><div><div class="eyebrow">STRUCTURED QUESTION LIBRARY</div><h1>بانک هوشمند سؤال</h1><p>تولید ساختاریافته از فایل منبع، ذخیره دائمی و استفاده مجدد در تمرین و آزمون.</p></div><button class="button button-ghost" id="refreshQuestionBank">↻ به‌روزرسانی</button></div>
+      <div class="workspace-grid">
+        <form class="panel-card form-panel" id="structuredQuestionForm">
+          <div class="panel-heading"><div><h3>ساخت سؤال از منبع</h3><p>مدل، متن منبع و نوع سؤال را مشخص کن.</p></div><span class="tag tag-ai">AI</span></div>
+          <label>فایل متنی / جزوه<select class="input" name="resource_id" id="questionResource" required><option value="">انتخاب منبع آموزشی</option></select></label>
+          <label>مدل<select class="input model-select" name="model" data-kind="models" required><option value="">انتخاب مدل</option></select></label>
+          <div class="form-two"><label>درس / رشته<input class="input" name="subject" placeholder="مثلاً زبان انگلیسی" required></label><label>سطح<input class="input" name="level" placeholder="مثلاً A2 / پایه هفتم"></label></div>
+          <div class="form-two"><label>مهارت<select class="input" name="skill"><option value="general">عمومی</option><option value="listening">Listening</option><option value="speaking">Speaking</option><option value="reading">Reading</option><option value="writing">Writing</option><option value="grammar">Grammar</option><option value="vocabulary">Vocabulary</option></select></label><label>نوع سؤال<select class="input" name="question_type"><option value="multiple_choice">چهارگزینه‌ای</option><option value="written">تشریحی</option><option value="true_false">درست / نادرست</option><option value="fill_blank">جای خالی</option><option value="matching">وصل‌کردنی</option><option value="ordering">مرتب‌سازی</option><option value="listening">شنیداری</option><option value="speaking">گفتاری</option></select></label></div>
+          <div class="form-two"><label>تعداد سؤال<input class="input" type="number" name="count" value="10" min="1" max="40"></label><label>سطح دشواری<select class="input" name="difficulty"><option value="easy">آسان</option><option value="medium" selected>متوسط</option><option value="hard">سخت</option></select></label></div>
+          <label>اختصاص به دانش‌آموز<select class="input" name="target_student_id" id="questionTargetStudent"><option value="">بانک عمومی</option></select></label>
+          <button class="button button-primary full-button" type="submit">ساخت و ذخیره در بانک سؤال</button><div class="form-message" id="structuredQuestionMessage"></div>
+        </form>
+        <section class="panel-card result-panel"><div class="panel-heading"><div><h3>خروجی ساختاریافته</h3><p>گزینه‌ها، پاسخ صحیح، توضیح و بارم به تفکیک هر سؤال ذخیره می‌شوند.</p></div></div><div id="structuredQuestionOutput" class="output-area">برای تولید، یک منبع متنی انتخاب کن.</div></section>
+      </div>
       <section class="panel-card table-panel">
-        <div class="filter-row"><input id="bankQuestionSearch" class="input" placeholder="جست‌وجوی سؤال، درس یا پایه..."><span id="bankQuestionCount" class="muted-label"></span></div>
-        <div class="table-scroll"><table><thead><tr><th>شناسه</th><th>متن سؤال</th><th>درس</th><th>پایه</th><th>منبع</th><th>تاریخ</th><th>عملیات</th></tr></thead><tbody id="bankQuestionRows"><tr><td colspan="7" class="empty-cell">در حال دریافت...</td></tr></tbody></table></div>
+        <div class="filter-row"><input id="bankQuestionSearch" class="input" placeholder="جست‌وجوی متن سؤال یا درس..."><span id="bankQuestionCount" class="muted-label"></span></div>
+        <div class="table-scroll"><table><thead><tr><th>شناسه</th><th>سؤال</th><th>نوع</th><th>درس / سطح</th><th>دانش‌آموز</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody id="bankQuestionRows"><tr><td colspan="7" class="empty-cell">در حال دریافت...</td></tr></tbody></table></div>
       </section>
     </section>
 
@@ -269,6 +289,70 @@ $assetVersion = max(
         <div class="table-scroll"><table><thead><tr><th>شناسه</th><th>ایمیل</th><th>نقش</th><th>وضعیت</th><th>تاریخ عضویت</th><th>عملیات</th></tr></thead><tbody id="userRows"><tr><td colspan="6" class="empty-cell">در حال دریافت...</td></tr></tbody></table></div>
       </section>
       <p class="notice">برای جلوگیری از قفل‌شدن پنل، غیرفعال‌کردن حساب مدیر فعلی مجاز نیست.</p>
+    </section>
+
+    <section class="page-view" id="page-students">
+      <div class="page-heading"><div><div class="eyebrow">STUDENT ACCOUNTS</div><h1>مدیریت دانش‌آموزان</h1><p>ایجاد حساب، تعیین رمز، سطح، گروه و کنترل دسترسی به اپلیکیشن.</p></div><button class="button button-ghost" id="refreshStudents">↻ به‌روزرسانی</button></div>
+      <div class="workspace-grid">
+        <form class="panel-card form-panel" id="studentCreateForm"><h3>ایجاد دانش‌آموز جدید</h3>
+          <label>نام و نام خانوادگی<input class="input" name="name" required></label>
+          <div class="form-two"><label>نام کاربری<input class="input" name="username" required minlength="3"></label><label>کد دانش‌آموزی<input class="input" name="student_code"></label></div>
+          <div class="form-two"><label>شماره تماس<input class="input" name="phone" dir="ltr"></label><label>ایمیل<input class="input" name="email" type="email" dir="ltr"></label></div>
+          <div class="form-two"><label>سطح آموزشی<input class="input" name="level" placeholder="مثلاً A2"></label><label>کلاس / گروه<input class="input" name="group_name"></label></div>
+          <label>رمز عبور اولیه<input class="input" name="password" type="password" minlength="8" autocomplete="new-password" required></label>
+          <button class="button button-primary full-button" type="submit">ساخت حساب دانش‌آموز</button><div class="form-message" id="studentCreateMessage"></div>
+        </form>
+        <section class="panel-card result-panel"><h3>راهنمای حساب</h3><div class="security-row"><i>✓</i><span><b>ورود با نام کاربری</b><small>دانش‌آموز با نام کاربری و رمز تعیین‌شده در اپ وارد می‌شود.</small></span></div><div class="security-row"><i>✓</i><span><b>تغییر یا بازیابی رمز</b><small>مدیر می‌تواند رمز جدید تعیین کند؛ نشست‌های قبلی باطل می‌شوند.</small></span></div><div class="security-row"><i>✓</i><span><b>سطح و گروه</b><small>تخصیص محتوا و آزمون‌ها بر اساس سطح و گروه قابل انجام است.</small></span></div></section>
+      </div>
+      <section class="panel-card table-panel"><div class="filter-row"><input id="studentSearch" class="input" placeholder="جست‌وجوی نام، نام کاربری، شماره یا کد..."><select id="studentStatusFilter" class="input"><option value="">همه وضعیت‌ها</option><option value="active">فعال</option><option value="disabled">غیرفعال</option><option value="pending">در انتظار</option></select><span id="studentCount" class="muted-label"></span></div><div class="table-scroll"><table><thead><tr><th>شناسه</th><th>نام</th><th>نام کاربری</th><th>سطح / گروه</th><th>آخرین فعالیت</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody id="studentRows"><tr><td colspan="7" class="empty-cell">در حال دریافت...</td></tr></tbody></table></div></section>
+    </section>
+
+    <section class="page-view" id="page-resources">
+      <div class="page-heading"><div><div class="eyebrow">LEARNING LIBRARY</div><h1>کتاب‌ها و جزوه‌ها</h1><p>مرکز محتوای آموزشی؛ فایل‌های TXT و MD برای تولید سؤال و PDF برای نمایش داخل اپ.</p></div><button class="button button-ghost" id="refreshResources">↻ به‌روزرسانی</button></div>
+      <div class="workspace-grid">
+        <form class="panel-card form-panel" id="resourceCreateForm"><h3>افزودن کتاب یا منبع</h3>
+          <label>عنوان<input class="input" name="title" required></label>
+          <div class="form-two"><label>نوع<select class="input" name="resource_type"><option value="book">کتاب</option><option value="handout">جزوه</option><option value="lesson">درس</option><option value="course">دوره</option><option value="source">فایل منبع AI</option></select></label><label>درس / رشته<input class="input" name="subject"></label></div>
+          <div class="form-two"><label>سطح<input class="input" name="level" placeholder="مثلاً B1"></label><label>نمایش در اپ<select class="input" name="published"><option value="0">پیش‌نویس</option><option value="1">منتشر شود</option></select></label></div>
+          <label>توضیحات<textarea class="input textarea" name="description" rows="2"></textarea></label>
+          <label>فایل منبع (TXT / MD / PDF)<input class="input" type="file" name="resource_file" accept=".txt,.md,.pdf"></label>
+          <label>متن منبع (اختیاری)<textarea class="input textarea" name="content_text" rows="5" placeholder="برای تولید سؤال از روی محتوا، متن را اینجا قرار دهید یا فایل TXT/MD بارگذاری کنید."></textarea></label>
+          <button class="button button-primary full-button" type="submit">ذخیره در کتابخانه</button><div class="form-message" id="resourceCreateMessage"></div>
+        </form>
+        <section class="panel-card result-panel"><h3>انواع محتوا</h3><div class="security-row"><i>▣</i><span><b>کتاب و جزوه</b><small>فایل PDF منتشرشده در فهرست محتوای اپ نمایش داده می‌شود.</small></span></div><div class="security-row"><i>✧</i><span><b>منبع تولید AI</b><small>متن فایل TXT/MD برای تولید سؤال ساختاریافته قابل استفاده است.</small></span></div><div class="notice">فایل‌های متنی با UTF-8 ذخیره شوند. برای PDF، نمایش و دانلود در اپ فعال است؛ استخراج متن PDF در این نسخه انجام نمی‌شود.</div></section>
+      </div>
+      <section class="panel-card table-panel"><div class="table-scroll"><table><thead><tr><th>عنوان</th><th>نوع</th><th>درس</th><th>سطح</th><th>انتشار</th><th>تاریخ</th><th>عملیات</th></tr></thead><tbody id="resourceRows"><tr><td colspan="7" class="empty-cell">در حال دریافت...</td></tr></tbody></table></div></section>
+    </section>
+
+    <section class="page-view" id="page-exams">
+      <div class="page-heading"><div><div class="eyebrow">EXAM BUILDER</div><h1>طراحی آزمون و زمان‌بندی</h1><p>آزمون زمان‌دار را از سؤال‌های بانک بساز و به یک دانش‌آموز یا همه سطح مربوط اختصاص بده.</p></div><button class="button button-ghost" id="refreshExams">↻ به‌روزرسانی</button></div>
+      <div class="workspace-grid">
+        <form class="panel-card form-panel" id="examCreateForm"><h3>آزمون جدید</h3>
+          <label>عنوان آزمون<input class="input" name="title" required></label>
+          <div class="form-two"><label>درس<input class="input" name="subject"></label><label>سطح<input class="input" name="level"></label></div>
+          <div class="form-two"><label>مدت آزمون (دقیقه)<input class="input" name="duration_minutes" type="number" min="1" max="600" value="30"></label><label>نمره قبولی (%)<input class="input" name="passing_score" type="number" min="0" max="100" value="50"></label></div>
+          <div class="form-two"><label>شروع (اختیاری)<input class="input" name="starts_at" type="datetime-local"></label><label>پایان (اختیاری)<input class="input" name="ends_at" type="datetime-local"></label></div>
+          <label>اختصاص به دانش‌آموز<select class="input" name="target_student_id" id="examTargetStudent"><option value="">تمام دانش‌آموزان سطح انتخاب‌شده</option></select></label>
+          <label>شناسه سؤال‌های بانک (با کاما جدا شود)<input class="input" name="question_ids" placeholder="12, 18, 24" required></label>
+          <div class="form-two"><label class="check-row"><input type="checkbox" name="shuffle_questions"><span>ترتیب تصادفی سؤال‌ها</span></label><label class="check-row"><input type="checkbox" name="shuffle_options"><span>ترتیب تصادفی گزینه‌ها</span></label></div>
+          <label>وضعیت<select class="input" name="status"><option value="draft">پیش‌نویس</option><option value="published">منتشرشده</option></select></label>
+          <button class="button button-primary full-button" type="submit">ساخت آزمون</button><div class="form-message" id="examCreateMessage"></div>
+        </form>
+        <section class="panel-card result-panel"><h3>کنترل زمان و تصحیح</h3><div class="security-row"><i>◷</i><span><b>زمان سمت سرور</b><small>مهلت آزمون در API کنترل می‌شود و با بستن اپ از نو آغاز نمی‌شود.</small></span></div><div class="security-row"><i>✓</i><span><b>تصحیح خودکار</b><small>چهارگزینه‌ای، درست/نادرست و جای‌خالی با کلید پاسخ نمره می‌گیرند.</small></span></div><div class="security-row"><i>✎</i><span><b>تصحیح دستی</b><small>تشریحی و پاسخ‌های گفتاری نیازمند بررسی مدرس هستند.</small></span></div></section>
+      </div>
+      <section class="panel-card table-panel"><div class="table-scroll"><table><thead><tr><th>عنوان</th><th>درس / سطح</th><th>تعداد سؤال</th><th>زمان</th><th>شروع / پایان</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody id="examRows"><tr><td colspan="7" class="empty-cell">در حال دریافت...</td></tr></tbody></table></div></section>
+    </section>
+
+    <section class="page-view" id="page-attempts">
+      <div class="page-heading"><div><div class="eyebrow">EXAM RESPONSES & GRADING</div><h1>پاسخ‌نامه‌ها و نمرات</h1><p>مشاهده پاسخ دانش‌آموز، زمان شروع و پایان، نمره و موارد نیازمند تصحیح دستی.</p></div><button class="button button-ghost" id="refreshAttempts">↻ به‌روزرسانی</button></div>
+      <section class="panel-card table-panel"><div class="table-scroll"><table><thead><tr><th>دانش‌آموز</th><th>آزمون</th><th>پاسخ داده‌شده</th><th>شروع</th><th>ارسال</th><th>نمره</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody id="attemptRows"><tr><td colspan="8" class="empty-cell">در حال دریافت...</td></tr></tbody></table></div></section>
+      <section class="panel-card" id="attemptDetailPanel" hidden><div class="panel-heading"><div><h3 id="attemptDetailTitle">جزئیات پاسخ‌نامه</h3><p id="attemptDetailMeta"></p></div><button class="button button-secondary" id="closeAttemptDetail" type="button">بستن</button></div><div id="attemptAnswers"></div></section>
+    </section>
+
+    <section class="page-view" id="page-monitoring">
+      <div class="page-heading"><div><div class="eyebrow">APPLICATION MONITORING</div><h1>مانیتورینگ اپلیکیشن</h1><p>آخرین حضور کاربران، ورودها، دانلود محتوا و فعالیت‌های آزمون در اپ Android / iOS / Web.</p></div><button class="button button-ghost" id="refreshMonitoring">↻ به‌روزرسانی</button></div>
+      <div class="metric-grid"><article class="metric-card"><div class="metric-top"><span>آنلاین در ۵ دقیقه اخیر</span><i>●</i></div><strong id="onlineStudentCount">—</strong><small>بر اساس آخرین heartbeat / API activity</small></article><article class="metric-card"><div class="metric-top"><span>رویدادهای اخیر</span><i>⌁</i></div><strong id="monitorEventCount">—</strong><small>آخرین ۱۰۰ رویداد ثبت‌شده</small></article></div>
+      <div class="dashboard-grid"><section class="panel-card table-panel"><h3>دانش‌آموزان آنلاین</h3><div class="table-scroll"><table><thead><tr><th>نام</th><th>نام کاربری</th><th>سطح / گروه</th><th>پلتفرم</th><th>آخرین فعالیت</th></tr></thead><tbody id="onlineStudentRows"></tbody></table></div></section><section class="panel-card table-panel"><h3>رویدادهای اخیر</h3><div class="table-scroll"><table><thead><tr><th>دانش‌آموز</th><th>رویداد</th><th>مسیر</th><th>پلتفرم</th><th>زمان</th></tr></thead><tbody id="monitorEventRows"></tbody></table></div></section></div>
     </section>
 
     <section class="page-view" id="page-prompts">
@@ -298,6 +382,8 @@ $assetVersion = max(
     <section class="page-view" id="page-settings">
       <div class="page-heading"><div><div class="eyebrow">SYSTEM CONFIGURATION</div><h1>تنظیمات اتصال و امنیت</h1><p>مدیریت امن کلید درگاه هوش مصنوعی و مدل پیش‌فرض.</p></div></div>
       <div class="settings-grid"><form class="panel-card form-panel" id="settingsForm"><div class="panel-heading"><div><h3>درگاه Paasta AI</h3><p>کلید فقط روی سرور Parse ذخیره و رمزگذاری می‌شود.</p></div><span class="status-badge" id="settingsStatus">در حال بررسی</span></div><div class="provider-large"><div class="provider-logo">✳</div><div><b>Paasta AI Gateway</b><small dir="ltr">https://console.paasta.cloud/api/ai/v1</small></div></div><label>کلید API پاستا<input class="input secret-input" type="password" name="api_key" autocomplete="new-password" placeholder="برای ثبت کلید جدید وارد کنید"></label><small class="field-hint">کلید فعلی هرگز به مرورگر بازگردانده نمی‌شود. خالی گذاشتن این قسمت، کلید ذخیره‌شده را تغییر نمی‌دهد.</small><label>مدل پیش‌فرض<select class="input model-select" name="default_model" data-kind="models"><option value="">انتخاب از کاتالوگ یا خالی</option></select></label><div class="inline-actions"><button class="button button-primary" type="submit">ذخیره امن تنظیمات</button><button class="button button-secondary" id="testProvider" type="button">تست کلید و اتصال</button></div><div class="form-message" id="settingsMessage"></div></form>
+      <form class="panel-card form-panel" id="platformSettingsForm"><div class="panel-heading"><div><h3>اتصال اپلیکیشن Parse</h3><p>آدرس پایه‌ای که اپ Android / iOS / Web برای دریافت داده‌ها استفاده می‌کند.</p></div></div><label>API Base URL<input class="input" name="api_base_url" dir="ltr" placeholder="https://api.aiparseh.ir/api" required></label><small class="field-hint">مقدار ذخیره‌شده برای تنظیم build اپ در دسترس است. آدرس باید HTTPS باشد.</small><div class="inline-actions"><button class="button button-primary" type="submit">ذخیره آدرس API</button></div><div class="form-message" id="platformSettingsMessage"></div><div class="security-note" id="platformApiStatus">در حال بررسی تنظیمات API...</div></form>
+      <form class="panel-card form-panel" id="fontForm"><div class="panel-heading"><div><h3>فونت اختصاصی پنل</h3><p>فایل فونت را بارگذاری کن تا در تمام بخش‌های پنل اعمال شود.</p></div><span class="status-badge" id="fontStatus">بدون فونت سفارشی</span></div><label>انتخاب فایل فونت<input class="input" type="file" name="font" accept=".woff2,.woff,.ttf,.otf" required></label><small class="field-hint">فرمت‌های WOFF2، WOFF، TTF و OTF · حداکثر ۸ مگابایت</small><button class="button button-secondary full-button" type="submit">بارگذاری و اعمال فونت</button><div class="form-message" id="fontMessage"></div></form>
       <section class="panel-card security-panel"><h3>وضعیت امنیت</h3><div class="security-row"><i>✓</i><span><b>ارتباط سمت سرور</b><small>کلید API در درخواست مرورگر نمایش داده نمی‌شود.</small></span></div><div class="security-row"><i>✓</i><span><b>رمزگذاری کلید</b><small>ذخیره با رمزنگاری Secretbox و کلید خارج از web root.</small></span></div><div class="security-row"><i>✓</i><span><b>نشست مدیر</b><small>کوکی HttpOnly و SameSite Strict با پایان نشست خودکار.</small></span></div><div class="security-row"><i>✓</i><span><b>محافظت CSRF</b><small>درخواست‌های تغییردهنده نیازمند توکن نشست هستند.</small></span></div><div class="security-row"><i>✓</i><span><b>ثبت مصرف</b><small>هزینه، توکن، مدل، وضعیت و رسید؛ بدون محتوای پیام.</small></span></div><div class="notice">کلید معتبر پاستا را از کنسول سرویس بسازید. کلید را در چت یا کد سمت مرورگر قرار ندهید.</div></section></div>
     </section>
     <footer class="app-footer"><span>PARSE ADMIN</span><span>Secure server-side console · <?= date('Y') ?></span></footer>
