@@ -154,6 +154,100 @@ if ($method === 'GET' && $path === '/resources') {
     respond(200, ['rows' => $stmt->fetchAll()]);
 }
 
+
+if ($method === 'GET' && $path === '/activities') {
+    $student = parse_require_student($pdo);
+    $stmt = $pdo->prepare(
+        'SELECT a.id,a.activity_type,a.title,a.description,a.subject,a.level,a.due_at,a.status,
+                saa.status AS assignment_status,saa.score,saa.completed_at,
+                (SELECT COUNT(*) FROM activity_questions aq WHERE aq.activity_id=a.id) AS question_count
+         FROM student_activity_assignments saa
+         INNER JOIN learning_activities a ON a.id=saa.activity_id
+         WHERE saa.student_id=? AND a.status=\\'published\\'
+         ORDER BY a.due_at IS NULL,a.due_at,a.id DESC'
+    );
+    $stmt->execute([(int)$student['id']]);
+    respond(200,['rows'=>$stmt->fetchAll()]);
+}
+
+if ($method === 'GET' && preg_match('#^/activities/([1-9][0-9]*)$#',$path,$m)) {
+    $student = parse_require_student($pdo);
+    $id=(int)$m[1];
+    $head=$pdo->prepare(
+      'SELECT a.id,a.activity_type,a.title,a.description,a.subject,a.level,a.instructions,a.due_at,a.status,
+              saa.status AS assignment_status
+       FROM learning_activities a JOIN student_activity_assignments saa ON saa.activity_id=a.id
+       WHERE a.id=? AND saa.student_id=? AND a.status=\\'published\\' LIMIT 1'
+    );
+    $head->execute([$id,(int)$student['id']]);$activity=$head->fetch();
+    if(!$activity)respond(404,['message'=>'این تمرین برای حساب شما در دسترس نیست.']);
+    $questions=$pdo->prepare(
+      'SELECT q.id,q.question_text,q.question_type,q.options_json,q.skill,q.difficulty,aq.position,q.points
+       FROM activity_questions aq JOIN question_bank q ON q.id=aq.question_id
+       WHERE aq.activity_id=? AND q.status=\\'published\\' ORDER BY aq.position'
+    );
+    $questions->execute([$id]);$activity['questions']=$questions->fetchAll();
+    foreach($activity['questions'] as &$question){
+      $question['options']=$question['options_json']?json_decode((string)$question['options_json'],true):null;
+      unset($question['options_json']);
+    }
+    unset($question);
+    respond(200,['activity'=>$activity]);
+}
+
+if ($method === 'POST' && preg_match('#^/activities/([1-9][0-9]*)/submit$#',$path,$m)) {
+    $student=parse_require_student($pdo);$activityId=(int)$m[1];$body=request_body();
+    $assignment=$pdo->prepare(
+      'SELECT a.id,a.due_at FROM learning_activities a
+       JOIN student_activity_assignments saa ON saa.activity_id=a.id
+       WHERE a.id=? AND saa.student_id=? AND a.status=\\'published\\' LIMIT 1'
+    );
+    $assignment->execute([$activityId,(int)$student['id']]);$activity=$assignment->fetch();
+    if(!$activity)respond(404,['message'=>'این تمرین برای حساب شما در دسترس نیست.']);
+    if($activity['due_at'] && strtotime((string)$activity['due_at'])<time())respond(409,['message'=>'مهلت ارسال این تمرین به پایان رسیده است.']);
+    $answers=$body['answers']??[];
+    if(!is_array($answers)||count($answers)>200)respond(422,['message'=>'ساختار پاسخ‌ها معتبر نیست.']);
+    $pdo->beginTransaction();
+    try{
+      $pdo->prepare(
+        'INSERT INTO activity_submissions(activity_id,student_id,status)
+         VALUES(?,?,\\'in_progress\\') ON DUPLICATE KEY UPDATE status=\\'in_progress\\''
+      )->execute([$activityId,(int)$student['id']]);
+      $find=$pdo->prepare('SELECT id FROM activity_submissions WHERE activity_id=? AND student_id=?');
+      $find->execute([$activityId,(int)$student['id']]);$submissionId=(int)$find->fetchColumn();
+      $allowed=$pdo->prepare('SELECT q.id,q.question_type,q.answer_json,aq.points FROM activity_questions aq JOIN question_bank q ON q.id=aq.question_id WHERE aq.activity_id=? AND q.id=? AND q.status=\\'published\\'');
+      $save=$pdo->prepare(
+        'INSERT INTO activity_answers(submission_id,question_id,answer_json,is_correct,awarded_points)
+         VALUES(?,?,?,?,?) ON DUPLICATE KEY UPDATE answer_json=VALUES(answer_json),is_correct=VALUES(is_correct),awarded_points=VALUES(awarded_points),answered_at=UTC_TIMESTAMP()'
+      );
+      $score=0.0;$total=0.0;$manual=0;
+      foreach($answers as $entry){
+        if(!is_array($entry))continue;
+        $questionId=(int)($entry['question_id']??0);
+        if($questionId<1||!array_key_exists('answer',$entry))continue;
+        $allowed->execute([$activityId,$questionId]);$q=$allowed->fetch();
+        if(!$q)continue;
+        $points=(float)$q['points'];$total+=$points;$given=$entry['answer'];
+        $objective=in_array($q['question_type'],['multiple_choice','true_false','fill_blank','ordering'],true);
+        if($objective){
+          $correct=json_decode((string)$q['answer_json'],true);
+          $norm=static fn($v)=>mb_strtolower(trim(is_scalar($v)?(string)$v:json_encode($v,JSON_UNESCAPED_UNICODE)));
+          $isCorrect=$norm($given)===$norm($correct);$awarded=$isCorrect?$points:0.0;$score+=$awarded;
+        }else{$isCorrect=null;$awarded=null;$manual++;}
+        $save->execute([$submissionId,$questionId,parse_json($given),$isCorrect===null?null:($isCorrect?1:0),$awarded]);
+      }
+      $pdo->prepare(
+        'UPDATE activity_submissions SET submitted_at=UTC_TIMESTAMP(),score=?,total_points=?,status=\\'submitted\\' WHERE id=?'
+      )->execute([$score,$total,$submissionId]);
+      $pdo->prepare(
+        'UPDATE student_activity_assignments SET completed_at=UTC_TIMESTAMP(),score=?,status=\\'submitted\\' WHERE activity_id=? AND student_id=?'
+      )->execute([$score,$activityId,(int)$student['id']]);
+      $pdo->commit();
+    }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
+    parse_store_event($pdo,(int)$student['id'],'activity.submit','/activities/'.$activityId,['submission_id'=>$submissionId]);
+    respond(200,['submitted'=>true,'score'=>$score,'total_points'=>$total,'pending_manual_review'=>$manual]);
+}
+
 if ($method === 'GET' && $path === '/exams') {
     $student = parse_require_student($pdo);
     $stmt = $pdo->prepare(
