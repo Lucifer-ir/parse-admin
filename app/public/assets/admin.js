@@ -375,12 +375,17 @@
     });
 
     $('#runMessages').addEventListener('click',async()=>{
-      const data=payloadFromForm($('#chatForm'));
-      if(!data.model||!data.message) return toast('مدل و پیام را وارد کنید.','error');
+      let data;
+      try { data=parseAdvancedOptions(payloadFromForm($('#chatForm'))); }
+      catch { return setMessage('#chatMessage','ساختار JSON در تنظیمات پیشرفته معتبر نیست.','error'); }
+      if(!data.model||(!data.message&&!data.messages)) return toast('مدل و پیام یا ساختار Messages را وارد کنید.','error');
       $('#chatState').textContent='Anthropic Messages';
       setMessage('#chatMessage','در حال ارسال به مسیر Anthropic Messages...');
       try {
-        const result=await api('/ai/messages',{method:'POST',body:json({model:data.model,message:data.message,system:data.system,max_tokens:Number(data.max_tokens||1024)})});
+        const result=await api('/ai/messages',{method:'POST',body:json({
+          model:data.model,message:data.message,messages:data.messages,system:data.system,
+          max_tokens:Number(data.max_tokens||1024),pdf_processing:data.pdf_processing
+        })});
         displayText('#chatOutput',result.output||formatObject(result.data));
         $('#chatUsage').textContent='شناسه درخواست: '+(result.request_id||'—');
         setMessage('#chatMessage','درخواست Messages با موفقیت انجام شد.','success');
