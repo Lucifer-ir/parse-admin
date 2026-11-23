@@ -1,19 +1,45 @@
 <!doctype html>
 <html lang="fa" dir="rtl">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f5f6f8"><title>Parse Admin</title><link rel="stylesheet" href="./assets/style.css"></head>
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#f4f6fa"><title>Parse Admin</title>
+<link rel="stylesheet" href="./assets/style.css">
+</head>
 <body>
 <main class="shell">
-<section id="login" class="login-card">
-<div class="brand"><h1>Parse <span>Admin</span></h1><small>مدیریت پلتفرم آموزشی</small></div>
-<p class="muted">برای ورود به پنل، با حساب مدیر وارد شوید.</p>\n<section class="api-setup"><h3>اتصال به Parse API</h3><label>آدرس سرویس API<input id="api" type="url" placeholder="https://your-api-domain.com"></label><div class="api-buttons"><button id="saveSettings" class="ghost" type="button">ذخیره آدرس</button><button id="testApi" class="ghost" type="button">بررسی اتصال</button></div><p id="settingsMessage" class="muted">ابتدا آدرس API را تنظیم کنید.</p></section>
-<form id="loginForm"><label>نام کاربری / ایمیل<input id="username" autocomplete="username" value="admin@parse.local" required></label><label>رمز عبور<input id="password" type="password" autocomplete="current-password" value="ParseAdmin123!" required></label><button class="primary" type="submit">ورود</button><p id="loginError" class="error"></p></form>
+<section id="login" class="login-layout">
+  <div class="login-aside"><div class="brand brand-light"><h1>Parse<span>Admin</span></h1></div><div><p class="eyebrow">CONTROL CENTER</p><h2>مدیریت متمرکز پلتفرم آموزشی پارسه</h2><p>کاربران، محتوای آموزشی و سلامت سرویس را از یک فضای یکپارچه مدیریت کنید.</p></div><div class="aside-foot">PARSE PLATFORM · ADMIN CONSOLE</div></div>
+  <section class="login-card">
+    <div class="brand"><h1>خوش آمدید</h1><small>ورود مدیر سیستم</small></div>
+    <p class="muted">با حساب کاربری مدیر API وارد شوید.</p>
+    <form id="loginForm">
+      <label>ایمیل مدیر<input id="username" type="email" autocomplete="username" placeholder="admin@example.com" required></label>
+      <label>رمز عبور<input id="password" type="password" autocomplete="current-password" placeholder="رمز عبور حساب مدیر" required></label>
+      <button class="primary" type="submit">ورود به پنل <span>←</span></button>
+      <p id="loginError" class="error" role="alert"></p>
+    </form>
+    <details class="api-config" open>
+      <summary>تنظیم اتصال API</summary>
+      <label>آدرس اصلی API<input id="api" type="url" inputmode="url" placeholder="https://api.example.com"></label>
+      <div class="inline-actions"><button id="saveSettings" class="secondary" type="button">ذخیره آدرس</button><button id="testApi" class="text-button" type="button">تست اتصال</button></div>
+      <p id="settingsMessage" class="hint">آدرس API فقط در همین مرورگر ذخیره می‌شود.</p>
+    </details>
+  </section>
 </section>
 <section id="dashboard" hidden>
-<header class="top"><div class="brand"><h1>Parse <span>Admin</span></h1><small>داشبورد مدیریت</small></div><div class="top-actions"><span id="adminName" class="muted"></span><button id="logout" class="ghost">خروج</button></div></header>
-<div class="welcome"><h2>داشبورد</h2><p class="muted">نمای کلی آمار پلتفرم</p></div>
-<div class="cards"><article class="stat"><span>کاربران</span><strong id="users">—</strong><small>کل حساب‌های ثبت‌شده</small></article><article class="stat"><span>منابع آموزشی</span><strong id="sources">—</strong><small>کل منابع بارگذاری‌شده</small></article><article class="stat"><span>سؤالات</span><strong id="questions">—</strong><small>کل سؤالات ذخیره‌شده</small></article></div>
-<div class="panel"><div><h3>وضعیت اتصال</h3><p id="connection" class="muted">—</p></div><button id="refresh" class="ghost">به‌روزرسانی</button></div>
-<section class="settings"><h3>تنظیمات اتصال</h3><p class="muted">آدرس API از بخش ورود قابل مدیریت است.</p></section>
-<footer>Parse Admin</footer>
+<header class="topbar"><div class="brand"><div class="brand-mark">P</div><div><h1>Parse <span>Admin</span></h1><small>مدیریت پلتفرم</small></div></div><div class="top-actions"><span id="adminName" class="admin-pill"></span><button id="logout" class="secondary">خروج از حساب</button></div></header>
+<div class="page-heading"><div><p class="eyebrow">OVERVIEW</p><h2>داشبورد مدیریتی</h2><p class="muted">نمای کلی وضعیت و فعالیت پلتفرم</p></div><button id="refresh" class="secondary">↻ به‌روزرسانی</button></div>
+<div class="stat-grid">
+<article class="stat-card"><div class="stat-icon blue">♙</div><span>کل کاربران</span><strong id="users">—</strong><small id="activeUsers">— کاربر فعال</small></article>
+<article class="stat-card"><div class="stat-icon violet">▤</div><span>سؤالات</span><strong id="questions">—</strong><small>بانک سؤالات پلتفرم</small></article>
+<article class="stat-card"><div class="stat-icon amber">▧</div><span>منابع آموزشی</span><strong id="sources">—</strong><small>منابع ثبت‌شده</small></article>
+<article class="stat-card"><div class="stat-icon green">✓</div><span>وضعیت سرویس</span><strong class="status-value" id="serviceStatus">—</strong><small id="connection">در انتظار بررسی</small></article>
+</div>
+<nav class="tabs" aria-label="بخش‌های مدیریت"><button class="tab active" data-tab="usersPanel">کاربران</button><button class="tab" data-tab="questionsPanel">بانک سؤالات</button><button class="tab" data-tab="settingsPanel">تنظیمات</button></nav>
+<section id="usersPanel" class="content-panel"><div class="section-head"><div><h3>مدیریت کاربران</h3><p class="muted">فهرست حساب‌های ثبت‌شده در سامانه</p></div><input id="userSearch" class="search" placeholder="جست‌وجوی ایمیل..."></div><div class="table-wrap"><table><thead><tr><th>شناسه</th><th>ایمیل</th><th>نقش</th><th>وضعیت</th><th>تاریخ ثبت</th></tr></thead><tbody id="usersTable"><tr><td colspan="5" class="empty">برای دریافت اطلاعات، داشبورد را به‌روزرسانی کنید.</td></tr></tbody></table></div></section>
+<section id="questionsPanel" class="content-panel" hidden><div class="section-head"><div><h3>بانک سؤالات</h3><p class="muted">جست‌وجو و مدیریت سؤالات ذخیره‌شده</p></div><input id="questionSearch" class="search" placeholder="جست‌وجوی متن سؤال..."></div><div class="table-wrap"><table><thead><tr><th>شناسه</th><th>متن سؤال</th><th>درس</th><th>پایه</th><th>نوع منبع</th><th>عملیات</th></tr></thead><tbody id="questionsTable"><tr><td colspan="6" class="empty">در حال آماده‌سازی</td></tr></tbody></table></div></section>
+<section id="settingsPanel" class="content-panel" hidden><div class="section-head"><div><h3>تنظیمات اتصال</h3><p class="muted">آدرس سرویس مرکزی را مدیریت و اتصال را بررسی کنید.</p></div></div><div class="settings-form"><label>Base URL سرویس API<input id="apiSettings" type="url" placeholder="https://api.example.com"></label><div class="inline-actions"><button id="saveDashboardApi" class="primary" type="button">ذخیره تنظیمات</button><button id="checkDashboardApi" class="secondary" type="button">بررسی سلامت API</button></div><p id="dashboardSettingsMessage" class="hint"></p></div><div class="security-note"><strong>نکته امنیتی</strong><p>توکن ورود فقط تا پایان نشست مرورگر نگهداری می‌شود. برای استفاده عمومی، API باید از HTTPS و CORS محدودشده به دامنه پنل استفاده کند.</p></div></section>
+<footer>Parse Admin <span>·</span> <span id="apiOrigin"></span></footer>
 </section>
-</main><script src="./assets/app.js"></script></body></html>
+</main><div id="toast" class="toast" role="status"></div><script src="./assets/app.js"></script>
+</body></html>
