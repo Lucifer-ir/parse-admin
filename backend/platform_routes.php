@@ -256,12 +256,12 @@ if ($method === 'GET' && $path === '/exams') {
         'SELECT e.id,e.title,e.description,e.subject,e.level,e.duration_minutes,e.starts_at,e.ends_at,e.show_result,
                 COUNT(eq.question_id) AS question_count
          FROM exams e LEFT JOIN exam_questions eq ON eq.exam_id=e.id
-         WHERE e.status=\'published\' AND (e.target_student_id IS NULL OR e.target_student_id=?) AND (e.track_id IS NULL OR e.track_id=?)
+         WHERE e.status=\'published\' AND (e.target_student_id IS NULL OR e.target_student_id=?) AND (e.track_id IS NULL OR e.track_id=?) AND (e.level IS NULL OR e.level=\'\' OR e.level=?)
            AND (e.starts_at IS NULL OR e.starts_at<=UTC_TIMESTAMP())
            AND (e.ends_at IS NULL OR e.ends_at>=UTC_TIMESTAMP())
          GROUP BY e.id ORDER BY e.starts_at,e.id DESC'
     );
-    $stmt->execute([(int)$student['id'],(int)($student['track_id'] ?? 0)]);
+    $stmt->execute([(int)$student['id'],(int)($student['track_id'] ?? 0),(string)($student['level'] ?? '')]);
     respond(200, ['rows' => $stmt->fetchAll()]);
 }
 
@@ -270,7 +270,7 @@ if ($method === 'GET' && preg_match('#^/exams/([1-9][0-9]*)$#', $path, $m)) {
     $examId = (int)$m[1];
     $stmt = $pdo->prepare(
         'SELECT id,title,description,subject,level,track_id,duration_minutes,starts_at,ends_at,show_result,status
-         FROM exams WHERE id=? AND status=\'published\' AND (target_student_id IS NULL OR target_student_id=?) AND (track_id IS NULL OR track_id=?) LIMIT 1'
+         FROM exams WHERE id=? AND status=\'published\' AND (target_student_id IS NULL OR target_student_id=?) AND (track_id IS NULL OR track_id=?) AND (level IS NULL OR level=\'\' OR level=?) LIMIT 1'
     );
     $stmt->execute([$examId, (int)$student['id'],(int)($student['track_id'] ?? 0),(string)($student['level'] ?? '')]);
     $exam = $stmt->fetch();
@@ -295,7 +295,7 @@ if ($method === 'POST' && preg_match('#^/exams/([1-9][0-9]*)/start$#', $path, $m
     $examId = (int)$m[1];
     $check = $pdo->prepare(
         'SELECT id,duration_minutes FROM exams WHERE id=? AND status=\'published\'
-         AND (target_student_id IS NULL OR target_student_id=?) AND (track_id IS NULL OR track_id=?)
+         AND (target_student_id IS NULL OR target_student_id=?) AND (track_id IS NULL OR track_id=?) AND (level IS NULL OR level=\'\' OR level=?)
          AND (starts_at IS NULL OR starts_at<=UTC_TIMESTAMP())
          AND (ends_at IS NULL OR ends_at>=UTC_TIMESTAMP()) LIMIT 1'
     );
@@ -355,7 +355,7 @@ if ($method === 'POST' && preg_match('#^/exams/([1-9][0-9]*)/submit$#', $path, $
     $student = parse_require_student($pdo);
     $examId = (int)$m[1];
     $attemptStmt = $pdo->prepare(
-        'SELECT id FROM exam_attempts WHERE exam_id=? AND student_id=? AND status=\'in_progress\'
+        'SELECT id,expires_at FROM exam_attempts WHERE exam_id=? AND student_id=? AND status=\'in_progress\'
          ORDER BY id DESC LIMIT 1'
     );
     $attemptStmt->execute([$examId, (int)$student['id']]);
@@ -388,9 +388,10 @@ if ($method === 'POST' && preg_match('#^/exams/([1-9][0-9]*)/submit$#', $path, $
             $manual++;
         }
     }
+    $finalStatus = strtotime((string)$attemptRow['expires_at'] . ' UTC') <= time() ? 'expired' : 'submitted';
     $pdo->prepare(
-        'UPDATE exam_attempts SET submitted_at=UTC_TIMESTAMP(),score=?,total_points=?,status=\'submitted\' WHERE id=?'
-    )->execute([$score, $total, $attemptId]);
+        'UPDATE exam_attempts SET submitted_at=UTC_TIMESTAMP(),score=?,total_points=?,status=? WHERE id=?'
+    )->execute([$score, $total, $finalStatus, $attemptId]);
     parse_store_event($pdo, (int)$student['id'], 'exam.submit', '/exams/'.$examId, ['attempt_id' => $attemptId]);
     respond(200, ['submitted' => true, 'status' => $finalStatus, 'score' => $score, 'total_points' => $total, 'pending_manual_review' => $manual]);
 }
