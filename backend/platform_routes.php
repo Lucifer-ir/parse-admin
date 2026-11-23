@@ -258,6 +258,7 @@ if ($method === 'GET' && $path === '/exams') {
     $student = parse_require_student($pdo);
     $stmt = $pdo->prepare(
         'SELECT e.id,e.title,e.description,e.subject,e.level,e.duration_minutes,e.starts_at,e.ends_at,e.show_result,
+                (SELECT ea.status FROM exam_attempts ea WHERE ea.exam_id=e.id AND ea.student_id=? ORDER BY ea.id DESC LIMIT 1) AS attempt_status,
                 COUNT(eq.question_id) AS question_count
          FROM exams e LEFT JOIN exam_questions eq ON eq.exam_id=e.id
          WHERE e.status=\'published\' AND (e.target_student_id IS NULL OR e.target_student_id=?) AND (e.track_id IS NULL OR e.track_id=?) AND (e.level IS NULL OR e.level=\'\' OR e.level=?)
@@ -265,7 +266,7 @@ if ($method === 'GET' && $path === '/exams') {
            AND (e.ends_at IS NULL OR e.ends_at>=UTC_TIMESTAMP())
          GROUP BY e.id ORDER BY e.starts_at,e.id DESC'
     );
-    $stmt->execute([(int)$student['id'],(int)($student['track_id'] ?? 0),(string)($student['level'] ?? '')]);
+    $stmt->execute([(int)$student['id'],(int)$student['id'],(int)($student['track_id'] ?? 0),(string)($student['level'] ?? '')]);
     respond(200, ['rows' => $stmt->fetchAll()]);
 }
 
