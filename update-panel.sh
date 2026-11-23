@@ -50,8 +50,8 @@ cat > "/etc/php/$PHP_VERSION/fpm/conf.d/99-parse-admin.ini" <<'PHPINI'
 expose_php=Off
 display_errors=Off
 log_errors=On
-upload_max_filesize=16M
-post_max_size=20M
+upload_max_filesize=20M
+post_max_size=24M
 max_execution_time=420
 max_input_time=420
 memory_limit=256M
