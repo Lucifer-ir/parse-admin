@@ -123,14 +123,14 @@
 
   function responseModels(payload) {
     if (Array.isArray(payload)) return payload;
-    for (const candidate of [payload?.data, payload?.models, payload?.items, payload?.results]) {
+    for (const candidate of [payload?.data, payload?.models, payload?.items, payload?.results, payload?.voices]) {
       if (Array.isArray(candidate)) return candidate;
     }
     return [];
   }
 
   function modelId(model) {
-    return String(model.id || model.model || model.slug || model.name || '');
+    return String(model.id || model.model || model.slug || model.name || model.voice || '');
   }
 
   function modelLabel(model) {
@@ -182,7 +182,7 @@
       renderCatalog(kind);
       return state.catalogs[kind];
     }
-    const routes = {models:'models',decisions:'decisions',images:'images',audio:'audio',embeddings:'embeddings'};
+    const routes = {models:'models',decisions:'decisions',images:'images',audio:'audio',speech:'speech',embeddings:'embeddings'};
     try {
       const payload = await api('/catalog/' + routes[kind]);
       const models = responseModels(payload);
@@ -633,7 +633,7 @@
       state.bootstrap=await api('/bootstrap');
       await loadDashboard();
       if (state.bootstrap.provider_configured) {
-        await Promise.allSettled([loadCatalog('models'),loadCatalog('decisions'),loadCatalog('images'),loadCatalog('audio'),loadCatalog('embeddings')]);
+        await Promise.allSettled([loadCatalog('models'),loadCatalog('decisions'),loadCatalog('images'),loadCatalog('audio'),loadCatalog('speech'),loadCatalog('embeddings')]);
       } else {
         toast('برای فعال شدن ابزارهای هوش مصنوعی، ابتدا کلید سرویس را در تنظیمات ثبت کنید.','info');
       }
