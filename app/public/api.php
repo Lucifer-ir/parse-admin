@@ -258,7 +258,7 @@ function platform_json_value(mixed $value): ?string
 
 if ($method === 'GET' && $path === '/platform/education-catalog') {
     $languages=app_db()->query("SELECT language_code,language_name,native_name FROM learning_languages WHERE active=1 ORDER BY sort_order,language_name")->fetchAll();
-    $levels=app_db()->query("SELECT language_code,level_code,level_name,level_order FROM learning_levels WHERE active=1 ORDER BY language_code,level_order")->fetchAll();
+    $levels=app_db()->query("SELECT id,language_code,level_code,level_name,level_order,active FROM learning_levels ORDER BY language_code,level_order")->fetchAll();
     $classTypes=app_db()->query("SELECT id,code,title,description,active FROM class_types ORDER BY sort_order,title")->fetchAll();
     app_json(200,['languages'=>$languages,'levels'=>$levels,'class_types'=>$classTypes]);
 }
@@ -272,6 +272,28 @@ if ($method === 'GET' && $path === '/platform/tracks') {
        ORDER BY l.sort_order,t.track_title,t.course_title,t.level_code'
     )->fetchAll();
     app_json(200,['rows'=>$rows]);
+}
+
+if ($method === 'POST' && $path === '/platform/levels') {
+    $body=app_request_json();
+    $languageCode=strtolower(trim((string)($body['language_code']??'')));
+    $levelCode=strtoupper(trim((string)($body['level_code']??'')));
+    $levelName=trim((string)($body['level_name']??''));
+    $levelOrder=max(1,min(999,(int)($body['level_order']??100)));
+    if(!preg_match('/^[a-z]{2,16}$/',$languageCode)||!preg_match('/^[A-Z0-9_-]{1,16}$/',$levelCode)||$levelName===''||mb_strlen($levelName)>120)app_json(422,['error'=>'زبان، کد سطح و عنوان سطح را معتبر وارد کنید.']);
+    $language=app_db()->prepare('SELECT language_code FROM learning_languages WHERE language_code=? AND active=1');
+    $language->execute([$languageCode]);if(!$language->fetchColumn())app_json(422,['error'=>'زبان انتخاب‌شده معتبر یا فعال نیست.']);
+    try{
+      $stmt=app_db()->prepare('INSERT INTO learning_levels(language_code,level_code,level_name,level_order,active) VALUES(?,?,?,?,1)');
+      $stmt->execute([$languageCode,$levelCode,$levelName,$levelOrder]);
+    }catch(PDOException $e){if((string)$e->getCode()==='23000')app_json(409,['error'=>'این سطح برای زبان انتخاب‌شده قبلاً تعریف شده است.']);throw $e;}
+    app_json(201,['ok'=>true,'id'=>(int)app_db()->lastInsertId()]);
+}
+
+if ($method === 'POST' && preg_match('#^/platform/levels/([1-9][0-9]*)/status$#',$path,$m)) {
+    $body=app_request_json();$active=!empty($body['active'])?1:0;
+    app_db()->prepare('UPDATE learning_levels SET active=? WHERE id=?')->execute([$active,(int)$m[1]]);
+    app_json(200,['ok'=>true,'active'=>(bool)$active]);
 }
 
 if ($method === 'POST' && $path === '/platform/class-types') {
@@ -307,6 +329,7 @@ if ($method === 'POST' && $path === '/platform/tracks') {
     $lang=app_db()->prepare('SELECT language_name FROM learning_languages WHERE language_code=? AND active=1 LIMIT 1');
     $lang->execute([$languageCode]);$languageName=$lang->fetchColumn();
     if(!$languageName)app_json(422,['error'=>'زبان انتخاب‌شده معتبر یا فعال نیست.']);
+    if($classTypeId===null)app_json(422,['error'=>'نوع کلاس برای مسیر آموزشی الزامی است.']);
     $level=app_db()->prepare('SELECT id FROM learning_levels WHERE language_code=? AND level_code=? AND active=1 LIMIT 1');
     $level->execute([$languageCode,$levelCode]);
     if(!$level->fetchColumn())app_json(422,['error'=>'سطح انتخاب‌شده در کاتالوگ این زبان تعریف نشده است.']);
