@@ -219,7 +219,7 @@ select.input{appearance:auto;cursor:pointer}
 .notice{padding:12px 14px;margin-top:15px;background:#2d2b1c;border:1px solid #61552c;border-radius:9px;color:#ddc881;font-size:9px;line-height:1.9}
 .filter-row label{display:grid;gap:6px;font-size:9px;color:#90a5bd;min-width:160px}
 .date-input{min-height:37px}
-.usage-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:13px 0 17px}
+.usage-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:13px 0 17px}.usage-detail summary{color:#68d8d0;cursor:pointer;font-size:9px}.usage-detail pre{white-space:pre-wrap;overflow-wrap:anywhere;max-width:360px;max-height:240px;overflow:auto;background:#0b1627;border:1px solid #2a3c55;border-radius:8px;padding:10px;color:#a8bfd7;font-size:8px;line-height:1.7;text-align:left;direction:ltr}
 .usage-summary>div{background:#172840;border:1px solid #293f5c;border-radius:10px;padding:12px}
 .usage-summary small,.usage-summary b{display:block}
 .usage-summary small{color:#8197b0;font-size:9px}.usage-summary b{font-size:16px;margin-top:6px}
