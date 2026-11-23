@@ -83,6 +83,10 @@ header('Referrer-Policy: strict-origin-when-cross-origin');
 header('X-Frame-Options: DENY');
 header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");
 $csrf=app_csrf();
+$assetVersion = max(
+    (int)(@filemtime(__DIR__ . '/assets/admin.css') ?: 0),
+    (int)(@filemtime(__DIR__ . '/assets/admin.js') ?: 0)
+);
 ?><!doctype html>
 <html lang="fa" dir="rtl">
 <head>
@@ -91,7 +95,7 @@ $csrf=app_csrf();
 <meta name="theme-color" content="#0a1222">
 <meta name="csrf-token" content="<?= app_e($csrf) ?>">
 <title><?= $admin ? 'کنسول مدیریت Parse' : 'ورود مدیر | Parse Admin' ?></title>
-<link rel="stylesheet" href="/assets/admin.css?v=20261123-php-console-1">
+<link rel="stylesheet" href="/assets/admin.css?v=<?= app_e((string)$assetVersion) ?>">
 </head>
 <body class="<?= $admin ? 'app-page' : 'login-page' ?>">
 <?php if (!$admin): ?>
@@ -300,6 +304,6 @@ $csrf=app_csrf();
   </main>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
-<script src="/assets/admin.js?v=20261123-php-console-1" defer></script>
+<script src="/assets/admin.js?v=<?= app_e((string)$assetVersion) ?>" defer></script>
 <?php endif; ?>
 </body></html>
