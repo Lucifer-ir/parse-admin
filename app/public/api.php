@@ -249,6 +249,20 @@ function platform_track_level(PDO $pdo, ?int $trackId): ?string
     return (string)$level;
 }
 
+function platform_audio_source_url(mixed $value): ?string
+{
+    $url=trim((string)($value??''));
+    if($url==='')return null;
+    if(strlen($url)>1000||filter_var($url,FILTER_VALIDATE_URL)===false){
+      app_json(422,['error'=>'نشانی فایل صوتی معتبر نیست.']);
+    }
+    $parts=parse_url($url);
+    if(!is_array($parts)||strtolower((string)($parts['scheme']??''))!=='https'||empty($parts['host'])||isset($parts['user'])||isset($parts['pass'])){
+      app_json(422,['error'=>'برای فایل صوتی فقط نشانی عمومی HTTPS مجاز است.']);
+    }
+    return $url;
+}
+
 function platform_json_value(mixed $value): ?string
 {
     if ($value === null || $value === '') return null;
@@ -796,7 +810,7 @@ if ($method === 'POST' && $path === '/platform/questions') {
                 $resourceId,$studentId,$trackId,$subject,
                 $resolvedLevel,$skill,$qType,
                 trim((string)$item['question_text']),platform_json_value($options),
-                trim((string)($item['audio_url'] ?? $body['audio_url'] ?? '')) ?: null,
+                platform_audio_source_url($item['audio_url'] ?? $body['audio_url'] ?? null),
                 platform_json_value($item['correct_answer'] ?? $item['answer'] ?? null),
                 trim((string)($item['explanation'] ?? '')) ?: null,$difficulty,
                 max(0.25,min(100,(float)($item['points'] ?? 1))),
@@ -875,7 +889,7 @@ if ($method === 'POST' && $path === '/platform/questions/generate') {
           $resourceId,$targetStudentId,$trackId,$subject,$level,
           in_array(($body['skill'] ?? 'general'),['listening','speaking','reading','writing','grammar','vocabulary','general'],true)?$body['skill']:'general',
           $itemType,trim((string)$item['question_text']),platform_json_value($options),
-          trim((string)($item['audio_url'] ?? $body['audio_url'] ?? '')) ?: null,
+          platform_audio_source_url($item['audio_url'] ?? $body['audio_url'] ?? null),
           platform_json_value($item['correct_answer'] ?? null),trim((string)($item['explanation'] ?? '')) ?: null,
           in_array(($item['difficulty'] ?? ''),['easy','medium','hard'],true)?$item['difficulty']:'medium',
           max(0.25,min(100,(float)($item['points'] ?? 1))),platform_json_value($item['tags'] ?? []),'draft',(int)$admin['id']
