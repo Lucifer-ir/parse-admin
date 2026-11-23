@@ -4,7 +4,7 @@
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
   const csrf = $('meta[name="csrf-token"]')?.content || '';
-  const state = { catalogs: {}, lastQuestionOutput: '', bootstrap: null, currentPage: 'dashboard', users: [], questions: [], prompts: [] };
+  const state = { catalogs: {}, lastQuestionOutput: '', bootstrap: null, currentPage: 'dashboard', users: [], questions: [], prompts: [], students: [], resources: [], exams: [], attempts: [], platformSettings: {} };
   const number = value => Number(value || 0).toLocaleString('fa-IR');
   const money = value => Number(value || 0).toLocaleString('fa-IR', { maximumFractionDigits: 2 });
   const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -70,7 +70,7 @@
       review:'بررسی و ویرایش متن', playground:'AI Playground', multimodal:'تصویر و صوت',
       structured:'تصمیم و Embedding', batches:'Batch و رسید درخواست',
       usage:'مصرف و هزینه‌ها', history:'تاریخچه تولید', settings:'تنظیمات اتصال',
-      'question-bank':'بانک سؤال‌ها', users:'مدیریت کاربران', prompts:'قالب‌های دستور AI'
+      'question-bank':'بانک هوشمند سؤال', users:'مدیریت مدیران', prompts:'قالب‌های دستور AI', students:'دانش‌آموزان', resources:'کتاب‌ها و جزوه‌ها', exams:'آزمون‌ها و زمان‌بندی', attempts:'پاسخ‌نامه‌ها و نمرات', monitoring:'مانیتورینگ اپ'
     };
     state.currentPage = page;
     $$('.page-view').forEach(node => node.classList.toggle('active', node.id === 'page-' + page));
@@ -81,10 +81,16 @@
     if (page === 'models') loadCatalog('models');
     if (page === 'usage') loadUsage();
     if (page === 'history') loadHistory();
-    if (page === 'settings') loadSettings();
+    if (page === 'settings') { loadSettings(); loadPlatformSettings(); }
     if (page === 'question-bank') loadQuestionBank();
     if (page === 'users') loadUsers();
     if (page === 'prompts') loadPrompts();
+    if (page === 'students') loadStudents();
+    if (page === 'resources') loadResources();
+    if (page === 'exams') { loadExams(); loadStudents(); }
+    if (page === 'attempts') loadAttempts();
+    if (page === 'monitoring') loadMonitoring();
+    if (page === 'question-bank') { loadPlatformQuestionBank(); loadResources(); loadStudents(); }
     if (page === 'questions' || page === 'practice' || page === 'review' || page === 'playground') {
       if (!state.catalogs.models) loadCatalog('models');
     }
@@ -777,6 +783,263 @@
     }
   }
 
+
+  function faDate(value, withTime = true) {
+    if (!value) return '—';
+    const date = new Date(String(value).replace(' ', 'T') + (String(value).endsWith('Z') ? '' : 'Z'));
+    return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString('fa-IR', withTime ? {} : {dateStyle:'medium'});
+  }
+
+  function statusLabel(value) {
+    return ({active:'فعال',disabled:'غیرفعال',pending:'در انتظار',draft:'پیش‌نویس',published:'منتشرشده',closed:'بسته',assigned:'اختصاص‌یافته',in_progress:'در حال انجام',submitted:'ارسال‌شده',reviewed:'بررسی‌شده',expired:'منقضی'})[value] || value || '—';
+  }
+
+  function questionTypeLabel(type) {
+    return ({multiple_choice:'چهارگزینه‌ای',written:'تشریحی',true_false:'درست / نادرست',fill_blank:'جای خالی',matching:'وصل‌کردنی',ordering:'مرتب‌سازی',listening:'شنیداری',speaking:'گفتاری'})[type] || type || '—';
+  }
+
+  async function loadStudents() {
+    const query = ($('#studentSearch')?.value || '').trim();
+    const status = $('#studentStatusFilter')?.value || '';
+    try {
+      const result = await api('/platform/students?limit=200&q='+encodeURIComponent(query)+'&status='+encodeURIComponent(status));
+      state.students = result.rows || [];
+      if ($('#studentCount')) $('#studentCount').textContent = number(state.students.length)+' دانش‌آموز';
+      if ($('#studentRows')) {
+        $('#studentRows').innerHTML = state.students.length ? state.students.map(row => {
+          const active = row.status === 'active';
+          return '<tr><td>'+number(row.id)+'</td><td>'+escapeHtml(row.name)+'</td><td dir="ltr">'+escapeHtml(row.username)+'</td><td>'+escapeHtml([row.level,row.group_name].filter(Boolean).join(' / ') || '—')+'</td><td>'+escapeHtml(faDate(row.last_seen_at))+'</td><td><span class="table-status '+(active?'ok':'bad')+'">'+escapeHtml(statusLabel(row.status))+'</span></td><td class="action-cell"><button class="button button-secondary" data-student-password="'+Number(row.id)+'">تغییر رمز</button> <button class="button button-secondary" data-student-status="'+Number(row.id)+'" data-status="'+escapeHtml(row.status)+'">'+(active?'غیرفعال':'فعال‌سازی')+'</button></td></tr>';
+        }).join('') : '<tr><td colspan="7" class="empty-cell">دانش‌آموزی پیدا نشد.</td></tr>';
+      }
+      const options = '<option value="">بانک عمومی / همه دانش‌آموزان</option>' + state.students.map(s=>'<option value="'+Number(s.id)+'">'+escapeHtml(s.name+' · '+s.username)+'</option>').join('');
+      ['#questionTargetStudent','#examTargetStudent'].forEach(selector => { if ($(selector)) { const current=$(selector).value; $(selector).innerHTML=options; if(current)$(selector).value=current; } });
+    } catch(error) {
+      if ($('#studentRows')) $('#studentRows').innerHTML='<tr><td colspan="7" class="empty-cell">'+escapeHtml(error.message)+'</td></tr>';
+      toast(error.message,'error');
+    }
+  }
+
+  async function loadResources() {
+    try {
+      const result=await api('/platform/resources');
+      state.resources=result.rows||[];
+      const selectable=state.resources.filter(r=>r.content_text && String(r.content_text).trim());
+      if ($('#questionResource')) {
+        const current=$('#questionResource').value;
+        $('#questionResource').innerHTML='<option value="">انتخاب منبع متنی</option>'+selectable.map(r=>'<option value="'+Number(r.id)+'">'+escapeHtml(r.title+' · '+(r.subject||r.resource_type))+'</option>').join('');
+        if(current)$('#questionResource').value=current;
+      }
+      if ($('#resourceRows')) {
+        $('#resourceRows').innerHTML=state.resources.length?state.resources.map(r=>'<tr><td>'+escapeHtml(r.title)+'</td><td>'+escapeHtml(r.resource_type)+'</td><td>'+escapeHtml(r.subject||'—')+'</td><td>'+escapeHtml(r.level||'—')+'</td><td><span class="table-status '+(Number(r.published)?'ok':'bad')+'">'+(Number(r.published)?'منتشر':'پیش‌نویس')+'</span></td><td>'+escapeHtml(faDate(r.created_at,false))+'</td><td><button class="button button-secondary" data-resource-publish="'+Number(r.id)+'" data-published="'+Number(r.published)+'">'+(Number(r.published)?'عدم انتشار':'انتشار')+'</button> <button class="danger-button" data-resource-delete="'+Number(r.id)+'">حذف</button></td></tr>').join(''):'<tr><td colspan="7" class="empty-cell">هنوز منبعی ثبت نشده است.</td></tr>';
+      }
+    } catch(error) {
+      if ($('#resourceRows')) $('#resourceRows').innerHTML='<tr><td colspan="7" class="empty-cell">'+escapeHtml(error.message)+'</td></tr>';
+      toast(error.message,'error');
+    }
+  }
+
+  async function loadPlatformQuestionBank() {
+    const term=($('#bankQuestionSearch')?.value||'').trim();
+    try {
+      const result=await api('/platform/questions?limit=200&q='+encodeURIComponent(term));
+      state.questions=result.rows||[];
+      if ($('#bankQuestionCount')) $('#bankQuestionCount').textContent=number(state.questions.length)+' سؤال';
+      if ($('#bankQuestionRows')) {
+        $('#bankQuestionRows').innerHTML=state.questions.length?state.questions.map(q=>{
+          const status=q.status==='published';
+          const kind=questionTypeLabel(q.question_type);
+          return '<tr><td>'+number(q.id)+'</td><td class="question-cell">'+escapeHtml(q.question_text)+'</td><td>'+escapeHtml(kind)+'</td><td>'+escapeHtml([q.subject,q.level].filter(Boolean).join(' / '))+'</td><td>'+escapeHtml(q.student_name||'عمومی')+'</td><td><span class="table-status '+(status?'ok':'bad')+'">'+escapeHtml(statusLabel(q.status))+'</span></td><td><button class="button button-secondary" data-question-publish="'+Number(q.id)+'" data-status="'+escapeHtml(q.status)+'">'+(status?'آرشیو':'انتشار')+'</button> <button class="danger-button" data-question-delete="'+Number(q.id)+'">حذف</button></td></tr>';
+        }).join(''):'<tr><td colspan="7" class="empty-cell">سؤالی در بانک وجود ندارد.</td></tr>';
+      }
+    } catch(error) {
+      if ($('#bankQuestionRows')) $('#bankQuestionRows').innerHTML='<tr><td colspan="7" class="empty-cell">'+escapeHtml(error.message)+'</td></tr>';
+      toast(error.message,'error');
+    }
+  }
+
+  async function loadExams() {
+    try {
+      const result=await api('/platform/exams');
+      state.exams=result.rows||[];
+      if ($('#examRows')) $('#examRows').innerHTML=state.exams.length?state.exams.map(e=>'<tr><td>'+escapeHtml(e.title)+'</td><td>'+escapeHtml([e.subject,e.level].filter(Boolean).join(' / ')||'—')+'</td><td>'+number(e.question_count)+'</td><td>'+number(e.duration_minutes)+' دقیقه</td><td>'+escapeHtml(faDate(e.starts_at)+' / '+faDate(e.ends_at))+'</td><td><span class="table-status '+(e.status==='published'?'ok':'bad')+'">'+escapeHtml(statusLabel(e.status))+'</span></td><td><button class="button button-secondary" data-exam-status="'+Number(e.id)+'" data-status="'+escapeHtml(e.status)+'">'+(e.status==='published'?'بستن آزمون':'انتشار')+'</button></td></tr>').join(''):'<tr><td colspan="7" class="empty-cell">هنوز آزمونی ساخته نشده است.</td></tr>';
+    } catch(error) { if ($('#examRows')) $('#examRows').innerHTML='<tr><td colspan="7" class="empty-cell">'+escapeHtml(error.message)+'</td></tr>'; toast(error.message,'error'); }
+  }
+
+  async function loadAttempts() {
+    try {
+      const result=await api('/platform/attempts');
+      state.attempts=result.rows||[];
+      if ($('#attemptRows')) $('#attemptRows').innerHTML=state.attempts.length?state.attempts.map(a=>'<tr><td>'+escapeHtml(a.student_name+' · '+a.username)+'</td><td>'+escapeHtml(a.exam_title)+'</td><td>'+number(a.answered_count)+' / '+number(a.question_count)+'</td><td>'+escapeHtml(faDate(a.started_at))+'</td><td>'+escapeHtml(faDate(a.submitted_at))+'</td><td>'+escapeHtml(a.score===null?'—':a.score+' / '+a.total_points)+'</td><td><span class="table-status '+(a.status==='reviewed'?'ok':'bad')+'">'+escapeHtml(statusLabel(a.status))+'</span></td><td><button class="button button-secondary" data-attempt-detail="'+Number(a.id)+'">مشاهده و تصحیح</button></td></tr>').join(''):'<tr><td colspan="8" class="empty-cell">هنوز پاسخ‌نامه‌ای ثبت نشده است.</td></tr>';
+    } catch(error) { if ($('#attemptRows')) $('#attemptRows').innerHTML='<tr><td colspan="8" class="empty-cell">'+escapeHtml(error.message)+'</td></tr>'; toast(error.message,'error'); }
+  }
+
+  async function loadAttemptDetail(id) {
+    try {
+      const result=await api('/platform/attempts/'+Number(id));
+      const a=result.attempt, answers=result.answers||[];
+      $('#attemptDetailPanel').hidden=false;
+      $('#attemptDetailTitle').textContent=a.student_name+' · '+a.exam_title;
+      $('#attemptDetailMeta').textContent='وضعیت: '+statusLabel(a.status)+' | نمره: '+(a.score??'—')+' از '+(a.total_points??'—');
+      $('#attemptAnswers').innerHTML=answers.map(row=>{
+        let given=row.student_answer||'—', options=row.options_json;
+        try { given=JSON.stringify(JSON.parse(given),null,2); } catch {}
+        try { options=options?JSON.parse(options):null; } catch { options=null; }
+        const correct=row.correct_answer ? '<details><summary>پاسخ معیار</summary><pre>'+escapeHtml(row.correct_answer)+'</pre></details>':'';
+        const manual=['written','speaking','listening'].includes(row.question_type);
+        return '<article class="attempt-answer"><h4>'+escapeHtml(row.question_text)+'</h4><small>'+escapeHtml(questionTypeLabel(row.question_type))+' · بارم '+escapeHtml(row.points)+'</small><div class="answer-columns"><div><b>پاسخ دانش‌آموز</b><pre>'+escapeHtml(given)+'</pre></div><div><b>گزینه‌ها</b><pre>'+escapeHtml(options?formatObject(options):'—')+'</pre></div></div>'+correct+(manual?'<form class="grade-answer-form" data-answer-id="'+Number(row.id)+'"><label>نمره<input class="input" name="awarded_points" type="number" min="0" max="'+Number(row.points)+'" step="0.25" value="'+Number(row.awarded_points||0)+'"></label><label>بازخورد<textarea class="input textarea" name="teacher_feedback" rows="2">'+escapeHtml(row.teacher_feedback||'')+'</textarea></label><button class="button button-primary" type="submit">ثبت تصحیح</button></form>':'<p class="muted-label">تصحیح خودکار · '+(Number(row.is_correct)===1?'درست':Number(row.is_correct)===0?'نادرست':'در انتظار')+'</p>')+'</article>';
+      }).join('')||'<div class="empty-state">پاسخی برای نمایش وجود ندارد.</div>';
+    } catch(error) { toast(error.message,'error'); }
+  }
+
+  async function loadMonitoring() {
+    try {
+      const result=await api('/platform/monitoring');
+      const online=result.online||[], events=result.events||[];
+      $('#onlineStudentCount').textContent=number(online.length);
+      $('#monitorEventCount').textContent=number(events.length);
+      $('#onlineStudentRows').innerHTML=online.length?online.map(s=>'<tr><td>'+escapeHtml(s.name)+'</td><td dir="ltr">'+escapeHtml(s.username)+'</td><td>'+escapeHtml([s.level,s.group_name].filter(Boolean).join(' / ')||'—')+'</td><td>'+escapeHtml(s.last_seen_platform||'نامشخص')+'</td><td>'+escapeHtml(faDate(s.last_seen_at))+'</td></tr>').join(''):'<tr><td colspan="5" class="empty-cell">در ۵ دقیقه اخیر کاربری فعال ثبت نشده است.</td></tr>';
+      $('#monitorEventRows').innerHTML=events.length?events.map(e=>'<tr><td>'+escapeHtml(e.student_name)+'</td><td>'+escapeHtml(e.event_type)+'</td><td dir="ltr">'+escapeHtml(e.route||'—')+'</td><td>'+escapeHtml(e.platform||'—')+'</td><td>'+escapeHtml(faDate(e.created_at))+'</td></tr>').join(''):'<tr><td colspan="5" class="empty-cell">رویدادی ثبت نشده است.</td></tr>';
+    } catch(error) { toast(error.message,'error'); }
+  }
+
+  async function loadPlatformSettings() {
+    try {
+      const result=await api('/platform/settings');
+      state.platformSettings=result;
+      $('#platformSettingsForm [name="api_base_url"]').value=result.api_base_url||'https://api.aiparseh.ir/api';
+      $('#platformApiStatus').textContent='API فعال در تنظیمات پنل: '+(result.api_base_url||'—');
+      $('#fontStatus').textContent=result.font_configured?'فونت سفارشی فعال':'بدون فونت سفارشی';
+    } catch(error) { setMessage('#platformSettingsMessage',error.message,'error'); }
+  }
+
+  function bindPlatformForms() {
+    $('#studentCreateForm').addEventListener('submit',async event=>{
+      event.preventDefault(); const form=event.currentTarget; const data=payloadFromForm(form);
+      setBusy(form,true,'در حال ساخت حساب...');
+      try { await api('/platform/students',{method:'POST',body:json(data)}); form.reset(); setMessage('#studentCreateMessage','حساب دانش‌آموز ایجاد شد.','success'); await loadStudents(); }
+      catch(error) { setMessage('#studentCreateMessage',error.message,'error'); }
+      finally { setBusy(form,false); }
+    });
+
+    $('#resourceCreateForm').addEventListener('submit',async event=>{
+      event.preventDefault(); const form=event.currentTarget; const file=form.elements.resource_file.files[0];
+      setBusy(form,true,'در حال ذخیره منبع...');
+      try {
+        let body;
+        if(file) { body=new FormData(form); }
+        else { body=json(payloadFromForm(form)); }
+        const result=await api('/platform/resources',{method:'POST',body});
+        form.reset(); setMessage('#resourceCreateMessage','منبع ذخیره شد. شناسه: '+number(result.id),'success'); await loadResources();
+      } catch(error) { setMessage('#resourceCreateMessage',error.message,'error'); }
+      finally { setBusy(form,false); }
+    });
+
+    $('#structuredQuestionForm').addEventListener('submit',async event=>{
+      event.preventDefault(); const form=event.currentTarget; const data=payloadFromForm(form);
+      data.resource_id=Number(data.resource_id); data.count=Number(data.count); data.target_student_id=data.target_student_id?Number(data.target_student_id):null;
+      setBusy(form,true,'در حال خواندن منبع و ساخت سؤال...');
+      try {
+        const result=await api('/platform/questions/generate',{method:'POST',body:json(data)});
+        $('#structuredQuestionOutput').textContent=(result.questions||[]).map((q,i)=>(i+1)+'. '+q.question_text+'\n'+(Array.isArray(q.options)?q.options.map(o=>(o.id||o.key||'')+' '+(o.text||o.label||o)).join('\n'):'')+'\nپاسخ: '+JSON.stringify(q.correct_answer)).join('\n\n')||result.output||'خروجی خالی بود.';
+        setMessage('#structuredQuestionMessage',number(result.saved)+' سؤال در بانک ذخیره شد.','success');
+        await loadPlatformQuestionBank();
+      } catch(error) { setMessage('#structuredQuestionMessage',error.message,'error'); }
+      finally { setBusy(form,false); }
+    });
+
+    $('#examCreateForm').addEventListener('submit',async event=>{
+      event.preventDefault();const form=event.currentTarget;const data=payloadFromForm(form);
+      data.question_ids=String(data.question_ids||'').split(',').map(x=>Number(x.trim())).filter(x=>Number.isInteger(x)&&x>0);
+      data.duration_minutes=Number(data.duration_minutes);data.passing_score=Number(data.passing_score);
+      if(data.starts_at)data.starts_at=data.starts_at.replace('T',' ')+':00'.slice(data.starts_at.length===16?0:3);
+      if(data.ends_at)data.ends_at=data.ends_at.replace('T',' ')+':00'.slice(data.ends_at.length===16?0:3);
+      data.target_student_id=data.target_student_id?Number(data.target_student_id):null;
+      setBusy(form,true,'در حال ساخت آزمون...');
+      try { const result=await api('/platform/exams',{method:'POST',body:json(data)});form.reset();setMessage('#examCreateMessage','آزمون ساخته شد. شناسه: '+number(result.id),'success');await loadExams(); }
+      catch(error) { setMessage('#examCreateMessage',error.message,'error'); }
+      finally { setBusy(form,false); }
+    });
+
+    $('#platformSettingsForm').addEventListener('submit',async event=>{
+      event.preventDefault();const data=payloadFromForm(event.currentTarget);
+      try { const result=await api('/platform/settings',{method:'POST',body:json(data)});setMessage('#platformSettingsMessage',result.message,'success');await loadPlatformSettings(); }
+      catch(error) { setMessage('#platformSettingsMessage',error.message,'error'); }
+    });
+
+    $('#fontForm').addEventListener('submit',async event=>{
+      event.preventDefault();const form=event.currentTarget;const data=new FormData(form);
+      setBusy(form,true,'در حال بارگذاری فونت...');
+      try { const result=await api('/settings/font',{method:'POST',body:data});setMessage('#fontMessage',result.message,'success');form.reset();setTimeout(()=>location.reload(),700); }
+      catch(error) { setMessage('#fontMessage',error.message,'error'); }
+      finally { setBusy(form,false); }
+    });
+
+    $('#attemptAnswers').addEventListener('submit',async event=>{
+      const form=event.target.closest('.grade-answer-form');if(!form)return;
+      event.preventDefault();const answerId=Number(form.dataset.answerId);const data=payloadFromForm(form);
+      data.awarded_points=Number(data.awarded_points);
+      try { await api('/platform/answers/'+answerId+'/grade',{method:'POST',body:json(data)});toast('تصحیح ذخیره شد.','success');await loadAttempts(); }
+      catch(error) { toast(error.message,'error'); }
+    });
+    $('#closeAttemptDetail').addEventListener('click',()=>$('#attemptDetailPanel').hidden=true);
+  }
+
+  function bindPlatformTables() {
+    $('#studentRows').addEventListener('click',async event=>{
+      const statusButton=event.target.closest('[data-student-status]');
+      const passwordButton=event.target.closest('[data-student-password]');
+      if(passwordButton){
+        const id=Number(passwordButton.dataset.studentPassword), password=prompt('رمز جدید (حداقل ۸ کاراکتر):');
+        if(password===null)return;
+        if(password.length<8)return toast('رمز باید حداقل ۸ کاراکتر باشد.','error');
+        try{await api('/platform/students/'+id+'/password',{method:'POST',body:json({password})});toast('رمز تغییر کرد و نشست‌های قبلی باطل شدند.','success');}
+        catch(error){toast(error.message,'error');}
+        return;
+      }
+      if(statusButton){
+        const id=Number(statusButton.dataset.studentStatus), current=statusButton.dataset.status;
+        const status=current==='active'?'disabled':'active';
+        try{await api('/platform/students/'+id+'/status',{method:'POST',body:json({status})});await loadStudents();toast('وضعیت دانش‌آموز تغییر کرد.','success');}
+        catch(error){toast(error.message,'error');}
+      }
+    });
+    $('#resourceRows').addEventListener('click',async event=>{
+      const publish=event.target.closest('[data-resource-publish]'), del=event.target.closest('[data-resource-delete]');
+      try{
+        if(publish){await api('/platform/resources/'+Number(publish.dataset.resourcePublish)+'/publish',{method:'POST',body:json({published:publish.dataset.published!=='1'})});await loadResources();}
+        if(del){if(!confirm('منبع و فایل آن حذف شود؟'))return;await api('/platform/resources/'+Number(del.dataset.resourceDelete),{method:'DELETE',body:'{}'});await loadResources();}
+      }catch(error){toast(error.message,'error');}
+    });
+    $('#bankQuestionRows').addEventListener('click',async event=>{
+      const publish=event.target.closest('[data-question-publish]'), del=event.target.closest('[data-question-delete]');
+      try{
+        if(publish){const status=publish.dataset.status==='published'?'archived':'published';await api('/platform/questions/'+Number(publish.dataset.questionPublish)+'/status',{method:'POST',body:json({status})});await loadPlatformQuestionBank();}
+        if(del){if(!confirm('سؤال از بانک حذف شود؟'))return;await api('/platform/questions/'+Number(del.dataset.questionDelete),{method:'DELETE',body:'{}'});await loadPlatformQuestionBank();}
+      }catch(error){toast(error.message,'error');}
+    });
+    $('#examRows').addEventListener('click',async event=>{
+      const button=event.target.closest('[data-exam-status]');if(!button)return;
+      const status=button.dataset.status==='published'?'closed':'published';
+      try{await api('/platform/exams/'+Number(button.dataset.examStatus)+'/status',{method:'POST',body:json({status})});await loadExams();}
+      catch(error){toast(error.message,'error');}
+    });
+    $('#attemptRows').addEventListener('click',event=>{
+      const button=event.target.closest('[data-attempt-detail]');if(button)loadAttemptDetail(Number(button.dataset.attemptDetail));
+    });
+  }
+
+  function initPlatformNavigation() {
+    $('#refreshStudents').addEventListener('click',loadStudents);
+    $('#refreshResources').addEventListener('click',loadResources);
+    $('#refreshExams').addEventListener('click',loadExams);
+    $('#refreshAttempts').addEventListener('click',loadAttempts);
+    $('#refreshMonitoring').addEventListener('click',loadMonitoring);
+    $('#studentSearch').addEventListener('input',()=>loadStudents());
+    $('#studentStatusFilter').addEventListener('change',loadStudents);
+    $('#refreshQuestionBank').addEventListener('click',loadPlatformQuestionBank);
+    $('#bankQuestionSearch').addEventListener('input',()=>loadPlatformQuestionBank());
+  }
+
   function showPrompt(prompt) {
     if(!prompt)return;
     $('#promptSlug').value=prompt.slug;
@@ -913,6 +1176,9 @@
   }
 
   async function init() {
+    bindPlatformForms();
+    bindPlatformTables();
+    initPlatformNavigation();
     const label=new Date().toLocaleDateString('fa-IR',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
     $('#todayLabel').textContent=label;
     initNavigation();
