@@ -53,6 +53,10 @@ fi
   echo "Backend files are missing from the repository checkout."
   exit 1
 }
+php -l "$INSTALL_DIR/backend/config.php"
+php -l "$INSTALL_DIR/backend/public/index.php"
+php -l "$INSTALL_DIR/backend/bin/create-admin.php"
+bash -n "$INSTALL_DIR/install.sh"
 
 echo "[3/8] Publishing the static admin panel..."
 install -d -m 0755 "$WEB_ROOT"
@@ -136,9 +140,10 @@ server {
     }
 
     location = /index.php {
-        include snippets/fastcgi-php.conf;
+        include fastcgi_params;
         fastcgi_pass unix:$PHP_FPM_SOCK;
         fastcgi_param SCRIPT_FILENAME $INSTALL_DIR/backend/public/index.php;
+        fastcgi_param DOCUMENT_ROOT $INSTALL_DIR/backend/public;
         fastcgi_hide_header X-Powered-By;
     }
 
