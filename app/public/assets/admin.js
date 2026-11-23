@@ -803,20 +803,47 @@
 
   async function loadTracks() {
     try {
-      const result = await api('/platform/tracks');
-      state.tracks = result.rows || [];
+      const [trackResult,catalog] = await Promise.all([api('/platform/tracks'),api('/platform/education-catalog')]);
+      state.tracks = trackResult.rows || [];
+      state.educationCatalog = catalog;
+      const activeTypes=(catalog.class_types||[]);
+      const activeLanguages=(catalog.languages||[]);
+      const activeLevels=(catalog.levels||[]);
       if ($('#trackRows')) {
         $('#trackRows').innerHTML = state.tracks.length ? state.tracks.map(track =>
-          '<tr><td>'+escapeHtml(track.language_name)+' <small dir="ltr">'+escapeHtml(track.language_code)+'</small></td><td>'+escapeHtml(track.track_title)+'</td><td>'+escapeHtml(track.course_title)+'</td><td>'+escapeHtml(track.level_code)+'</td><td><span class="table-status '+(Number(track.active)?'ok':'bad')+'">'+(Number(track.active)?'فعال':'غیرفعال')+'</span></td><td><button class="button button-secondary" data-track-status="'+Number(track.id)+'" data-active="'+Number(track.active)+'">'+(Number(track.active)?'غیرفعال‌سازی':'فعال‌سازی')+'</button></td></tr>'
-        ).join('') : '<tr><td colspan="6" class="empty-cell">هنوز مسیر آموزشی تعریف نشده است.</td></tr>';
+          '<tr><td>'+escapeHtml(track.language_name)+' <small dir="ltr">'+escapeHtml(track.language_code)+'</small></td><td>'+escapeHtml(track.track_title)+'</td><td>'+escapeHtml(track.course_title)+'</td><td>'+escapeHtml(track.level_code)+'</td><td>'+escapeHtml(track.class_type_title||'—')+'</td><td><span class="table-status '+(Number(track.active)?'ok':'bad')+'">'+(Number(track.active)?'فعال':'غیرفعال')+'</span></td><td><button class="button button-secondary" data-track-status="'+Number(track.id)+'" data-active="'+Number(track.active)+'">'+(Number(track.active)?'غیرفعال‌سازی':'فعال‌سازی')+'</button></td></tr>'
+        ).join('') : '<tr><td colspan="7" class="empty-cell">هنوز مسیر آموزشی تعریف نشده است.</td></tr>';
       }
-      const options='<option value="">بدون محدودیت مسیر</option>'+state.tracks.filter(t=>Number(t.active)).map(t=>'<option value="'+Number(t.id)+'">'+escapeHtml(t.language_name+' · '+t.track_title+' · '+t.course_title+' · '+t.level_code)+'</option>').join('');
-      ['#studentCreateForm [name="track_id"]','#resourceCreateForm [name="track_id"]','#structuredQuestionForm [name="track_id"]','#examCreateForm [name="track_id"]','#activityTrack'].forEach(selector=>{
+      if ($('#trackLanguage')) {
+        const selected=$('#trackLanguage').value||'en';
+        $('#trackLanguage').innerHTML=activeLanguages.map(l=>'<option value="'+escapeHtml(l.language_code)+'">'+escapeHtml(l.native_name||l.language_name)+'</option>').join('');
+        $('#trackLanguage').value=activeLanguages.some(l=>l.language_code===selected)?selected:(activeLanguages[0]?.language_code||'en');
+      }
+      const refreshTrackLevels=()=>{
+        if(!$('#trackLevel'))return;
+        const lang=$('#trackLanguage')?.value||'en', current=$('#trackLevel').value;
+        const levels=activeLevels.filter(level=>level.language_code===lang);
+        $('#trackLevel').innerHTML=levels.map(level=>'<option value="'+escapeHtml(level.level_code)+'">'+escapeHtml(level.level_code+' · '+level.level_name)+'</option>').join('');
+        if(levels.some(level=>level.level_code===current))$('#trackLevel').value=current;
+      };
+      refreshTrackLevels();
+      if($('#trackLanguage')&&!$('#trackLanguage').dataset.bound){
+        $('#trackLanguage').dataset.bound='1';
+        $('#trackLanguage').addEventListener('change',refreshTrackLevels);
+      }
+      const typeOptions='<option value="">نوع کلاس انتخاب نشده</option>'+activeTypes.map(t=>'<option value="'+Number(t.id)+'">'+escapeHtml(t.title)+'</option>').join('');
+      ['#trackClassType','#studentEditForm [name="track_id"]'].forEach(selector=>{
         const select=$(selector);
-        if(select){const previous=select.value;select.innerHTML=options;if(previous)select.value=previous;}
+        if(select&&selector==='#trackClassType'){const previous=select.value;select.innerHTML=typeOptions;select.value=previous;}
       });
+      const routeOptions='<option value="">بدون محدودیت مسیر</option>'+state.tracks.filter(t=>Number(t.active)).map(t=>'<option value="'+Number(t.id)+'">'+escapeHtml(t.language_name+' · '+t.track_title+' · '+t.course_title+' · '+t.level_code)+'</option>').join('');
+      ['#studentCreateForm [name="track_id"]','#studentEditForm [name="track_id"]','#resourceCreateForm [name="track_id"]','#structuredQuestionForm [name="track_id"]','#examCreateForm [name="track_id"]','#activityTrack'].forEach(selector=>{
+        const select=$(selector);
+        if(select){const previous=select.value;select.innerHTML=(selector==='#studentEditForm [name="track_id"]'?'<option value="">بدون مسیر آموزشی</option>':'<option value="">بدون محدودیت مسیر</option>')+routeOptions.replace('<option value="">بدون محدودیت مسیر</option>','');if(previous)select.value=previous;}
+      });
+      if($('#classTypeRows'))$('#classTypeRows').innerHTML=activeTypes.length?activeTypes.map(type=>'<tr><td>'+escapeHtml(type.title)+'</td><td dir="ltr">'+escapeHtml(type.code)+'</td><td><span class="table-status ok">فعال</span></td><td><button class="button button-secondary" data-class-type-status="'+Number(type.id)+'">غیرفعال‌سازی</button></td></tr>').join(''):'<tr><td colspan="4" class="empty-cell">هنوز نوع کلاسی تعریف نشده است.</td></tr>';
     } catch(error) {
-      if($('#trackRows'))$('#trackRows').innerHTML='<tr><td colspan="6" class="empty-cell">'+escapeHtml(error.message)+'</td></tr>';
+      if($('#trackRows'))$('#trackRows').innerHTML='<tr><td colspan="7" class="empty-cell">'+escapeHtml(error.message)+'</td></tr>';
       toast(error.message,'error');
     }
   }
@@ -861,7 +888,8 @@
         try{options=row.options_json?JSON.parse(row.options_json):null;}catch{}
         const key=row.correct_answer?'<details><summary>پاسخ معیار</summary><pre>'+escapeHtml(row.correct_answer)+'</pre></details>':'';
         const manual=['written','speaking','listening','matching'].includes(row.question_type)||row.is_correct===null;
-        return '<article class="attempt-answer"><h4>'+escapeHtml(row.question_text)+'</h4><small>'+escapeHtml(questionTypeLabel(row.question_type))+' · بارم '+escapeHtml(row.points)+'</small><div class="answer-columns"><div><b>پاسخ دانش‌آموز</b><pre>'+escapeHtml(response)+'</pre></div><div><b>گزینه‌ها</b><pre>'+escapeHtml(options?formatObject(options):'—')+'</pre></div></div>'+key+(manual?'<form class="grade-activity-answer-form" data-answer-id="'+Number(row.id)+'"><label>نمره<input class="input" name="awarded_points" type="number" min="0" max="'+Number(row.points)+'" step="0.25" value="'+Number(row.awarded_points||0)+'"></label><label>بازخورد<textarea class="input textarea" name="teacher_feedback" rows="2">'+escapeHtml(row.teacher_feedback||'')+'</textarea></label><button class="button button-primary" type="submit">ثبت تصحیح</button></form>':'<p class="muted-label">تصحیح خودکار · '+(Number(row.is_correct)===1?'درست':Number(row.is_correct)===0?'نادرست':'در انتظار')+'</p>')+'</article>';
+        const audio=row.audio_response_id?'<div class="audio-review"><b>پاسخ صوتی</b><audio controls preload="none" src="/api/platform/audio-responses/'+Number(row.audio_response_id)+'"></audio></div>':'';
+        return '<article class="attempt-answer"><h4>'+escapeHtml(row.question_text)+'</h4><small>'+escapeHtml(questionTypeLabel(row.question_type))+' · بارم '+escapeHtml(row.points)+'</small>'+audio+'<div class="answer-columns"><div><b>پاسخ دانش‌آموز</b><pre>'+escapeHtml(response)+'</pre></div><div><b>گزینه‌ها</b><pre>'+escapeHtml(options?formatObject(options):'—')+'</pre></div></div>'+key+(manual?'<form class="grade-activity-answer-form" data-answer-id="'+Number(row.id)+'"><label>نمره<input class="input" name="awarded_points" type="number" min="0" max="'+Number(row.points)+'" step="0.25" value="'+Number(row.awarded_points||0)+'"></label><label>بازخورد<textarea class="input textarea" name="teacher_feedback" rows="2">'+escapeHtml(row.teacher_feedback||'')+'</textarea></label><button class="button button-primary" type="submit">ثبت تصحیح</button></form>':'<p class="muted-label">تصحیح خودکار · '+(Number(row.is_correct)===1?'درست':Number(row.is_correct)===0?'نادرست':'در انتظار')+'</p>')+'</article>';
       }).join('')||'<div class="empty-state">پاسخی ثبت نشده است.</div>';
     } catch(error){toast(error.message,'error');}
   }
@@ -876,7 +904,8 @@
       if ($('#studentRows')) {
         $('#studentRows').innerHTML = state.students.length ? state.students.map(row => {
           const active = row.status === 'active';
-          return '<tr><td>'+number(row.id)+'</td><td>'+escapeHtml(row.name)+'</td><td dir="ltr">'+escapeHtml(row.username)+'</td><td>'+escapeHtml([row.level,row.group_name].filter(Boolean).join(' / ') || '—')+'</td><td>'+escapeHtml(faDate(row.last_seen_at))+'</td><td><span class="table-status '+(active?'ok':'bad')+'">'+escapeHtml(statusLabel(row.status))+'</span></td><td class="action-cell"><button class="button button-secondary" data-student-password="'+Number(row.id)+'">تغییر رمز</button> <button class="button button-secondary" data-student-status="'+Number(row.id)+'" data-status="'+escapeHtml(row.status)+'">'+(active?'غیرفعال':'فعال‌سازی')+'</button></td></tr>';
+          const course=[row.language_name,row.course_title,row.track_level||row.level,row.class_type_title,row.group_name].filter(Boolean).join(' · ');
+          return '<tr><td>'+number(row.id)+'</td><td>'+escapeHtml(row.name)+'</td><td dir="ltr">'+escapeHtml(row.username)+'</td><td>'+escapeHtml(course||'—')+'</td><td>'+escapeHtml(faDate(row.last_seen_at))+'</td><td><span class="table-status '+(active?'ok':'bad')+'">'+escapeHtml(statusLabel(row.status))+'</span></td><td class="action-cell"><button class="button button-secondary" data-student-edit="'+Number(row.id)+'">ویرایش</button> <button class="button button-secondary" data-student-password="'+Number(row.id)+'">تغییر رمز</button> <button class="button button-secondary" data-student-status="'+Number(row.id)+'" data-status="'+escapeHtml(row.status)+'">'+(active?'غیرفعال':'فعال‌سازی')+'</button></td></tr>';
         }).join('') : '<tr><td colspan="7" class="empty-cell">دانش‌آموزی پیدا نشد.</td></tr>';
       }
       const options = '<option value="">بانک عمومی / همه دانش‌آموزان</option>' + state.students.map(s=>'<option value="'+Number(s.id)+'">'+escapeHtml(s.name+' · '+s.username)+'</option>').join('');
@@ -954,7 +983,8 @@
         try { options=options?JSON.parse(options):null; } catch { options=null; }
         const correct=row.correct_answer ? '<details><summary>پاسخ معیار</summary><pre>'+escapeHtml(row.correct_answer)+'</pre></details>':'';
         const manual=['written','speaking','listening'].includes(row.question_type);
-        return '<article class="attempt-answer"><h4>'+escapeHtml(row.question_text)+'</h4><small>'+escapeHtml(questionTypeLabel(row.question_type))+' · بارم '+escapeHtml(row.points)+'</small><div class="answer-columns"><div><b>پاسخ دانش‌آموز</b><pre>'+escapeHtml(given)+'</pre></div><div><b>گزینه‌ها</b><pre>'+escapeHtml(options?formatObject(options):'—')+'</pre></div></div>'+correct+(manual?'<form class="grade-answer-form" data-answer-id="'+Number(row.id)+'"><label>نمره<input class="input" name="awarded_points" type="number" min="0" max="'+Number(row.points)+'" step="0.25" value="'+Number(row.awarded_points||0)+'"></label><label>بازخورد<textarea class="input textarea" name="teacher_feedback" rows="2">'+escapeHtml(row.teacher_feedback||'')+'</textarea></label><button class="button button-primary" type="submit">ثبت تصحیح</button></form>':'<p class="muted-label">تصحیح خودکار · '+(Number(row.is_correct)===1?'درست':Number(row.is_correct)===0?'نادرست':'در انتظار')+'</p>')+'</article>';
+        const audio=row.audio_response_id?'<div class="audio-review"><b>پاسخ صوتی</b><audio controls preload="none" src="/api/platform/audio-responses/'+Number(row.audio_response_id)+'"></audio></div>':'';
+        return '<article class="attempt-answer"><h4>'+escapeHtml(row.question_text)+'</h4><small>'+escapeHtml(questionTypeLabel(row.question_type))+' · بارم '+escapeHtml(row.points)+'</small>'+audio+'<div class="answer-columns"><div><b>پاسخ دانش‌آموز</b><pre>'+escapeHtml(given)+'</pre></div><div><b>گزینه‌ها</b><pre>'+escapeHtml(options?formatObject(options):'—')+'</pre></div></div>'+correct+(manual?'<form class="grade-answer-form" data-answer-id="'+Number(row.id)+'"><label>نمره<input class="input" name="awarded_points" type="number" min="0" max="'+Number(row.points)+'" step="0.25" value="'+Number(row.awarded_points||0)+'"></label><label>بازخورد<textarea class="input textarea" name="teacher_feedback" rows="2">'+escapeHtml(row.teacher_feedback||'')+'</textarea></label><button class="button button-primary" type="submit">ثبت تصحیح</button></form>':'<p class="muted-label">تصحیح خودکار · '+(Number(row.is_correct)===1?'درست':Number(row.is_correct)===0?'نادرست':'در انتظار')+'</p>')+'</article>';
       }).join('')||'<div class="empty-state">پاسخی برای نمایش وجود ندارد.</div>';
     } catch(error) { toast(error.message,'error'); }
   }
