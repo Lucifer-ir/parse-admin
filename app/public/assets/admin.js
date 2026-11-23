@@ -523,7 +523,12 @@
     initForms();
     try {
       state.bootstrap=await api('/bootstrap');
-      await Promise.allSettled([loadDashboard(),loadCatalog('models'),loadCatalog('decisions'),loadCatalog('images'),loadCatalog('audio'),loadCatalog('embeddings')]);
+      await loadDashboard();
+      if (state.bootstrap.provider_configured) {
+        await Promise.allSettled([loadCatalog('models'),loadCatalog('decisions'),loadCatalog('images'),loadCatalog('audio'),loadCatalog('embeddings')]);
+      } else {
+        toast('برای فعال شدن ابزارهای هوش مصنوعی، ابتدا کلید سرویس را در تنظیمات ثبت کنید.','info');
+      }
     } catch(error) {
       toast('خطا در راه‌اندازی کنسول: '+error.message,'error');
     }
