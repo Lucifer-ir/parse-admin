@@ -389,10 +389,20 @@
       $('#chatState').textContent='Anthropic Messages';
       setMessage('#chatMessage','در حال ارسال به مسیر Anthropic Messages...');
       try {
-        const result=await api('/ai/messages',{method:'POST',body:json({
-          model:data.model,message:data.message,messages:data.messages,system:data.system,
-          max_tokens:Number(data.max_tokens||1024),pdf_processing:data.pdf_processing
-        })});
+        const payload = {
+          model: data.model,
+          message: data.message,
+          messages: data.messages,
+          system: data.system,
+          max_tokens: Number(data.max_tokens || 1024)
+        };
+        [
+          'pdf_processing','tools','tool_choice','thinking','stop_sequences',
+          'temperature','top_p','top_k','metadata'
+        ].forEach(key => {
+          if (Object.prototype.hasOwnProperty.call(data, key)) payload[key] = data[key];
+        });
+        const result=await api('/ai/messages',{method:'POST',body:json(payload)});
         displayText('#chatOutput',result.output||formatObject(result.data));
         $('#chatUsage').textContent='شناسه درخواست: '+(result.request_id||'—');
         setMessage('#chatMessage','درخواست Messages با موفقیت انجام شد.','success');
