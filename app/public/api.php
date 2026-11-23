@@ -303,6 +303,7 @@ if ($method === 'POST' && $path === '/platform/activities') {
         $level=trim((string)($body['level']??''));
         $query=$level!==''?$pdo->prepare("SELECT id FROM students WHERE status='active' AND level=?"): $pdo->query("SELECT id FROM students WHERE status='active'");
         if($level!=='')$query->execute([$level]);
+        if($level==='' && !empty($body['track_id'])) { $query=$pdo->prepare("SELECT id FROM students WHERE status='active' AND track_id=?"); $query->execute([(int)$body['track_id']]); }
         $targetIds=array_map('intval',$query->fetchAll(PDO::FETCH_COLUMN));
       }
       if(count($targetIds)>10000)throw new InvalidArgumentException('تعداد دانش‌آموزان هدف بیش از حد مجاز است.');
@@ -446,12 +447,12 @@ if ($method === 'GET' && $path === '/platform/students') {
     $where = [];
     $params = [];
     if ($q !== '') {
-        $where[] = '(username LIKE ? OR name LIKE ? OR phone LIKE ? OR student_code LIKE ? OR email LIKE ?)';
+        $where[] = '(s.username LIKE ? OR s.name LIKE ? OR s.phone LIKE ? OR s.student_code LIKE ? OR s.email LIKE ?)';
         $term = '%' . $q . '%';
         array_push($params, $term, $term, $term, $term, $term);
     }
     if (in_array($status, ['active','disabled','pending'], true)) {
-        $where[] = 'status=?'; $params[] = $status;
+        $where[] = 's.status=?'; $params[] = $status;
     }
     $sqlWhere = $where ? ' WHERE ' . implode(' AND ', $where) : '';
     $stmt = app_db()->prepare(
