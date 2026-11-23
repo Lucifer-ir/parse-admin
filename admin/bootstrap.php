@@ -66,8 +66,21 @@ function admin_require_login(): array
 {
     if (empty($_SESSION['admin']) || !is_array($_SESSION['admin'])) {
         http_response_code(401);
-        exit('برای دسترسی به این بخش باید وارد شوید.');
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['ok' => false, 'message' => 'نشست مدیر معتبر نیست.']);
+        exit;
     }
+    $signedIn = (int)($_SESSION['admin']['signed_in_at'] ?? 0);
+    $lastActivity = (int)($_SESSION['admin']['last_activity'] ?? $signedIn);
+    if ($signedIn < 1 || time() - $signedIn > 43200 || time() - $lastActivity > 1800) {
+        $_SESSION = [];
+        session_regenerate_id(true);
+        http_response_code(401);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['ok' => false, 'message' => 'نشست مدیر منقضی شده است.']);
+        exit;
+    }
+    $_SESSION['admin']['last_activity'] = time();
     return $_SESSION['admin'];
 }
 
