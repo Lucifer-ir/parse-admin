@@ -247,6 +247,15 @@ function h(string $value): string { return htmlspecialchars($value, ENT_QUOTES |
           <label class="field full-field">ورودی کاربر<textarea id="playgroundInput" rows="7" placeholder="درخواست خود را بنویس..."></textarea></label>
           <label class="field">حداکثر خروجی<input id="playgroundMax" type="number" min="16" max="32768" value="1024"></label>
           <label class="field">دما (Temperature)<input id="playgroundTemp" type="number" min="0" max="2" step="0.1" value="0.7"></label>
+          <details class="advanced-options full-field">
+            <summary>تنظیمات پیشرفته درخواست</summary>
+            <div class="advanced-grid">
+              <label class="advanced-check"><input id="playgroundStream" type="checkbox"> پاسخ جریانی SSE</label>
+              <label class="advanced-check"><input id="playgroundWebSearch" type="checkbox"> جست‌وجوی وب (فقط Responses)</label>
+              <label class="field full-field">Function Tools JSON<textarea id="playgroundTools" rows="4" placeholder='[{"type":"function","function":{"name":"lookup","description":"...","parameters":{"type":"object","properties":{},"additionalProperties":false},"strict":true}}]'></textarea><small>حداکثر ۱۲۸ تابع؛ اجرای تابع باید توسط برنامه و با کنترل دسترسی انجام شود.</small></label>
+              <label class="field full-field">Structured Output / response_format JSON<textarea id="playgroundStructured" rows="4" placeholder='{"type":"json_schema","json_schema":{"name":"result","strict":true,"schema":{"type":"object","properties":{},"required":[],"additionalProperties":false}}}'></textarea></label>
+            </div>
+          </details>
           <div class="form-actions full-field"><button id="runPlayground" class="btn btn-primary" type="button">اجرای درخواست <span>✳</span></button><button id="clearPlayground" class="btn btn-secondary" type="button">پاک‌سازی</button></div>
         </div></div><div class="panel-card result-panel"><div class="panel-heading"><div><h3>خروجی مدل</h3><p>پاسخ، زمان و شناسه درخواست</p></div><span class="result-status" id="playgroundStatus">آماده</span></div><div id="playgroundResult" class="result-content placeholder-result">نتیجه اجرای درخواست اینجا نمایش داده می‌شود.</div><div class="result-meta" id="playgroundMeta"></div></div></div>
       </section>
