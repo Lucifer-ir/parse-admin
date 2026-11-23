@@ -302,7 +302,7 @@ $assetVersion = max(
           <label>نام و نام خانوادگی<input class="input" name="name" required></label>
           <div class="form-two"><label>نام کاربری<input class="input" name="username" required minlength="3"></label><label>کد دانش‌آموزی<input class="input" name="student_code"></label></div>
           <div class="form-two"><label>شماره تماس<input class="input" name="phone" dir="ltr"></label><label>ایمیل<input class="input" name="email" type="email" dir="ltr"></label></div>
-          <div class="form-two"><label>سطح آموزشی<input class="input" name="level" placeholder="مثلاً A2"></label><label>کلاس / گروه<input class="input" name="group_name"></label></div>
+          <label>کلاس / گروه<input class="input" name="group_name" placeholder="مثلاً گروه عصر"></label><p class="muted-label">سطح و زبان از مسیر آموزشی انتخاب‌شده تعیین می‌شود.</p>
           <label>مسیر آموزشی<select class="input" name="track_id"><option value="">بدون مسیر مشخص</option></select></label>
           <label>رمز عبور اولیه<input class="input" name="password" type="password" minlength="8" autocomplete="new-password" required></label>
           <button class="button button-primary full-button" type="submit">ساخت حساب دانش‌آموز</button><div class="form-message" id="studentCreateMessage"></div>
@@ -310,6 +310,18 @@ $assetVersion = max(
         <section class="panel-card result-panel"><h3>راهنمای حساب</h3><div class="security-row"><i>✓</i><span><b>ورود با نام کاربری</b><small>دانش‌آموز با نام کاربری و رمز تعیین‌شده در اپ وارد می‌شود.</small></span></div><div class="security-row"><i>✓</i><span><b>تغییر یا بازیابی رمز</b><small>مدیر می‌تواند رمز جدید تعیین کند؛ نشست‌های قبلی باطل می‌شوند.</small></span></div><div class="security-row"><i>✓</i><span><b>سطح و گروه</b><small>تخصیص محتوا و آزمون‌ها بر اساس سطح و گروه قابل انجام است.</small></span></div></section>
       </div>
       <section class="panel-card table-panel"><div class="filter-row"><input id="studentSearch" class="input" placeholder="جست‌وجوی نام، نام کاربری، شماره یا کد..."><select id="studentStatusFilter" class="input"><option value="">همه وضعیت‌ها</option><option value="active">فعال</option><option value="disabled">غیرفعال</option><option value="pending">در انتظار</option></select><span id="studentCount" class="muted-label"></span></div><div class="table-scroll"><table><thead><tr><th>شناسه</th><th>نام</th><th>نام کاربری</th><th>سطح / گروه</th><th>آخرین فعالیت</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody id="studentRows"><tr><td colspan="7" class="empty-cell">در حال دریافت...</td></tr></tbody></table></div></section>
+      <dialog class="panel-card" id="studentEditDialog" style="width:min(560px,calc(100% - 28px));border:0;border-radius:16px;padding:24px;box-shadow:0 24px 80px #102b2540">
+        <form id="studentEditForm" class="form-panel">
+          <div class="panel-heading"><div><h3>ویرایش دانش‌آموز</h3><p id="studentEditMeta" class="muted-label"></p></div></div>
+          <input type="hidden" name="student_id">
+          <label>نام و نام خانوادگی<input class="input" name="name" required></label>
+          <div class="form-two"><label>شماره تماس<input class="input" name="phone" dir="ltr"></label><label>ایمیل<input class="input" name="email" type="email" dir="ltr"></label></div>
+          <div class="form-two"><label>کد دانش‌آموزی<input class="input" name="student_code"></label><label>کلاس / گروه<input class="input" name="group_name"></label></div>
+          <label>مسیر / زبان / ترم / سطح<select class="input" name="track_id" id="studentEditTrack" required><option value="">انتخاب مسیر آموزشی</option></select></label>
+          <div class="form-message" id="studentEditMessage"></div>
+          <div class="form-two"><button type="button" class="button button-secondary" id="cancelStudentEdit">انصراف</button><button type="submit" class="button button-primary">ذخیره تغییرات</button></div>
+        </form>
+      </dialog>
     </section>
 
     <section class="page-view" id="page-resources">
@@ -366,15 +378,24 @@ $assetVersion = max(
       <div class="page-heading"><div><div class="eyebrow">LEARNING STRUCTURE</div><h1>زبان و مسیرهای آموزشی</h1><p>زبان، رشته، دوره و سطح را یک‌بار تعریف کن و دانش‌آموز، کتاب، تمرین و آزمون را به آن متصل کن.</p></div><button class="button button-ghost" id="refreshTracks">↻ به‌روزرسانی</button></div>
       <div class="workspace-grid">
         <form class="panel-card form-panel" id="trackCreateForm"><h3>تعریف مسیر آموزشی</h3>
-          <div class="form-two"><label>کد زبان (ISO)<input class="input" name="language_code" value="en" placeholder="en" dir="ltr" required></label><label>نام زبان<input class="input" name="language_name" placeholder="انگلیسی" required></label></div>
+          <label>زبان<select class="input" name="language_code" id="trackLanguage" required><option value="en">انگلیسی</option><option value="de">آلمانی</option><option value="fr">فرانسوی</option></select></label>
           <label>رشته / مسیر<input class="input" name="track_title" placeholder="زبان عمومی" required></label>
           <label>دوره آموزشی<input class="input" name="course_title" placeholder="دوره مکالمه بزرگسالان" required></label>
-          <label>سطح<input class="input" name="level_code" placeholder="A2" required></label>
+          <div class="form-two"><label>سطح<select class="input" name="level_code" id="trackLevel" required></select></label><label>نوع کلاس<select class="input" name="class_type_id" id="trackClassType"><option value="">انتخاب نوع کلاس</option></select></label></div>
           <label>توضیحات<textarea class="input textarea" name="description" rows="2"></textarea></label>
           <button class="button button-primary full-button" type="submit">ذخیره مسیر آموزشی</button><div class="form-message" id="trackCreateMessage"></div>
         </form>
         <section class="panel-card result-panel"><h3>نحوه تخصیص</h3><div class="security-row"><i>1</i><span><b>تعریف ساختار</b><small>هر مسیر شامل زبان، رشته، دوره و سطح مشخص است.</small></span></div><div class="security-row"><i>2</i><span><b>اتصال دانش‌آموز</b><small>حساب دانش‌آموز را به مسیر ثبت‌شده وصل کن.</small></span></div><div class="security-row"><i>3</i><span><b>محتوای متناسب</b><small>کتاب، تمرین و آزمون می‌توانند بر اساس مسیر و سطح فیلتر شوند.</small></span></div></section>
       </div>
+      <section class="panel-card" style="margin-top:16px">
+        <h3>تعریف نوع کلاس</h3>
+        <form id="classTypeCreateForm" class="form-panel">
+          <div class="form-two"><label>شناسه انگلیسی<input class="input" name="code" placeholder="hybrid" dir="ltr" required></label><label>عنوان نوع کلاس<input class="input" name="title" placeholder="کلاس ترکیبی" required></label></div>
+          <label>توضیحات<input class="input" name="description"></label>
+          <button class="button button-primary" type="submit">افزودن نوع کلاس</button><div id="classTypeMessage" class="form-message"></div>
+        </form>
+        <div class="table-scroll"><table><thead><tr><th>نوع کلاس</th><th>شناسه</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody id="classTypeRows"></tbody></table></div>
+      </section>
       <section class="panel-card table-panel"><div class="table-scroll"><table><thead><tr><th>زبان</th><th>رشته</th><th>دوره</th><th>سطح</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody id="trackRows"><tr><td colspan="6" class="empty-cell">در حال دریافت...</td></tr></tbody></table></div></section>
     </section>
 
