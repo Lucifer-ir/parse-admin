@@ -35,6 +35,17 @@ sudo LE_EMAIL=admin@aiparseh.ir bash /root/parse-admin-install.sh
 
 همین دستور برای به‌روزرسانی‌های بعدی هم استفاده می‌شود. جداول با `CREATE TABLE IF NOT EXISTS` ایجاد می‌شوند؛ داده‌های دیتابیس حذف نمی‌شوند و رمز دیتابیس در اجرای مجدد حفظ خواهد شد. برای تغییر ساختار دیتابیس باید migration افزایشی اضافه شود؛ schema این اسکریپت داده‌های موجود را drop نمی‌کند.
 
+## به‌روزرسانی فقط پنل (بدون دست‌زدن به دیتابیس)
+
+برای انتشار تغییرات HTML/CSS/JavaScript پس از نصب اولیه، روی سرور اجرا کنید:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Lucifer-ir/parse-admin/main/update-panel.sh -o /root/update-parse-panel.sh
+bash /root/update-parse-panel.sh
+```
+
+این اسکریپت فقط فایل‌های رابط مدیریت را منتشر و Nginx را reload می‌کند؛ دیتابیس، رمزهای مدیر و تنظیمات API را تغییر نمی‌دهد.
+
 ## API
 
 Base URL: `https://api.aiparseh.ir`
