@@ -360,14 +360,17 @@
       let data;
       try { data=parseAdvancedOptions(payloadFromForm($('#chatForm'))); }
       catch { return setMessage('#chatMessage','ساختار JSON در تنظیمات پیشرفته معتبر نیست.','error'); }
-      if(!data.model||!data.message) return toast('مدل و پیام را وارد کنید.','error');
+      const responseInput=data.responses_input || data.message;
+      const webSearch=!!payloadFromForm($('#chatForm')).web_search;
+      if(!data.model||(!responseInput)) return toast('مدل و ورودی Responses را وارد کنید.','error');
+      if(webSearch && typeof responseInput!=='string') return setMessage('#chatMessage','برای Web Search ورودی باید متن ساده باشد.','error');
       $('#chatState').textContent='Responses API';
       setMessage('#chatMessage','در حال ارسال به Responses API...');
       try {
         const result=await api('/ai/responses',{method:'POST',body:json({
-          model:data.model,input:data.responses_input || data.message,instructions:data.system,
+          model:data.model,input:responseInput,instructions:data.system,
           max_output_tokens:Number(data.max_tokens||1024),
-          save_history:data.save_history,web_search:!!payloadFromForm($('#chatForm')).web_search,
+          save_history:data.save_history,web_search:webSearch,
           tools:data.tools,tool_choice:data.tool_choice,response_format:data.response_format,
           pdf_processing:data.pdf_processing,structured_outputs:data.structured_outputs,
           max_tool_calls:data.max_tool_calls
@@ -457,6 +460,7 @@
       try { data=parseAdvancedOptions(payloadFromForm($('#chatForm'))); }
       catch { return setMessage('#chatMessage','ساختار JSON در تنظیمات پیشرفته معتبر نیست.','error'); }
       if(!data.model||(!data.message&&!data.responses_input)) return toast('مدل و ورودی را وارد کنید.','error');
+      if(!!payloadFromForm($('#chatForm')).web_search) return setMessage('#chatMessage','طبق قرارداد API، Web Search فقط در درخواست غیرجریانی Responses اجرا می‌شود.','error');
       const payload={
         model:data.model,
         input:data.responses_input||data.message,
