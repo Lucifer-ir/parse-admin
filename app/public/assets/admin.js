@@ -4,7 +4,7 @@
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
   const csrf = $('meta[name="csrf-token"]')?.content || '';
-  const state = { catalogs: {}, lastQuestionOutput: '', bootstrap: null, currentPage: 'dashboard' };
+  const state = { catalogs: {}, lastQuestionOutput: '', bootstrap: null, currentPage: 'dashboard', users: [], questions: [], prompts: [] };
   const number = value => Number(value || 0).toLocaleString('fa-IR');
   const money = value => Number(value || 0).toLocaleString('fa-IR', { maximumFractionDigits: 2 });
   const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -69,7 +69,8 @@
       dashboard:'داشبورد', models:'کاتالوگ مدل‌ها', questions:'تولید سؤال', practice:'طراحی تمرین',
       review:'بررسی و ویرایش متن', playground:'AI Playground', multimodal:'تصویر و صوت',
       structured:'تصمیم و Embedding', batches:'Batch و رسید درخواست',
-      usage:'مصرف و هزینه‌ها', history:'تاریخچه تولید', settings:'تنظیمات اتصال'
+      usage:'مصرف و هزینه‌ها', history:'تاریخچه تولید', settings:'تنظیمات اتصال',
+      'question-bank':'بانک سؤال‌ها', users:'مدیریت کاربران', prompts:'قالب‌های دستور AI'
     };
     state.currentPage = page;
     $$('.page-view').forEach(node => node.classList.toggle('active', node.id === 'page-' + page));
@@ -81,6 +82,9 @@
     if (page === 'usage') loadUsage();
     if (page === 'history') loadHistory();
     if (page === 'settings') loadSettings();
+    if (page === 'question-bank') loadQuestionBank();
+    if (page === 'users') loadUsers();
+    if (page === 'prompts') loadPrompts();
     if (page === 'questions' || page === 'practice' || page === 'review' || page === 'playground') {
       if (!state.catalogs.models) loadCatalog('models');
     }
@@ -570,6 +574,58 @@
     }catch(error){toast(error.message,'error');}
   }
 
+  async function loadQuestionBank() {
+    const term=$('#bankQuestionSearch').value.trim();
+    try {
+      const result=await api('/questions?limit=100&offset=0&q='+encodeURIComponent(term));
+      state.questions=result.rows||[];
+      $('#bankQuestionCount').textContent=number(state.questions.length)+' سؤال';
+      $('#bankQuestionRows').innerHTML=state.questions.length?state.questions.map(row=>'<tr><td>'+number(row.id)+'</td><td class="question-cell">'+escapeHtml(row.question)+'</td><td>'+escapeHtml(row.subject||'—')+'</td><td>'+escapeHtml(row.grade||'—')+'</td><td>'+escapeHtml(row.source_type||'—')+'</td><td>'+escapeHtml(new Date(row.created_at).toLocaleDateString('fa-IR'))+'</td><td><button class="danger-button" data-delete-bank-question="'+Number(row.id)+'">حذف</button></td></tr>').join(''):'<tr><td colspan="7" class="empty-cell">سؤالی در بانک پیدا نشد.</td></tr>';
+    } catch(error) {
+      $('#bankQuestionRows').innerHTML='<tr><td colspan="7" class="empty-cell">'+escapeHtml(error.message)+'</td></tr>';
+      toast(error.message,'error');
+    }
+  }
+
+  async function loadUsers() {
+    const term=$('#userSearch').value.trim();
+    try {
+      const result=await api('/users?limit=200&offset=0&q='+encodeURIComponent(term));
+      state.users=result.rows||[];
+      $('#userCount').textContent=number(state.users.length)+' حساب';
+      $('#userRows').innerHTML=state.users.length?state.users.map(row=>{
+        const active=!!Number(row.active);
+        return '<tr><td>'+number(row.id)+'</td><td dir="ltr">'+escapeHtml(row.email)+'</td><td>'+escapeHtml(row.role)+'</td><td><span class="table-status '+(active?'ok':'bad')+'">'+(active?'فعال':'غیرفعال')+'</span></td><td>'+escapeHtml(new Date(row.created_at).toLocaleDateString('fa-IR'))+'</td><td><button class="button button-secondary" data-user-status="'+Number(row.id)+'" data-active="'+(active?'1':'0')+'">'+(active?'غیرفعال‌سازی':'فعال‌سازی')+'</button></td></tr>';
+      }).join(''):'<tr><td colspan="6" class="empty-cell">کاربری پیدا نشد.</td></tr>';
+    } catch(error) {
+      $('#userRows').innerHTML='<tr><td colspan="6" class="empty-cell">'+escapeHtml(error.message)+'</td></tr>';
+      toast(error.message,'error');
+    }
+  }
+
+  function showPrompt(prompt) {
+    if(!prompt)return;
+    $('#promptSlug').value=prompt.slug;
+    $('#promptBody').value=prompt.system_prompt;
+    $('#promptEnabled').checked=!!Number(prompt.enabled);
+    $('#promptMeta').textContent=prompt.title+' · '+prompt.generation_type+' · '+prompt.slug;
+    setMessage('#promptMessage','');
+  }
+
+  async function loadPrompts() {
+    try {
+      const result=await api('/prompts');
+      state.prompts=result.rows||[];
+      const select=$('#promptSelect');
+      const previous=select.value;
+      select.innerHTML=state.prompts.map(row=>'<option value="'+escapeHtml(row.slug)+'">'+escapeHtml(row.title)+'</option>').join('');
+      if(previous&&state.prompts.some(row=>row.slug===previous))select.value=previous;
+      showPrompt(state.prompts.find(row=>row.slug===select.value)||state.prompts[0]);
+    } catch(error) {
+      setMessage('#promptMessage',error.message,'error');
+    }
+  }
+
   async function loadHistory() {
     try {
       const result=await api('/history');
@@ -607,6 +663,57 @@
       if(select)select.value=id;
       toast('مدل در اولین ابزار '+kind+' انتخاب شد.','success');
     });
+    $('#userRows').addEventListener('click',async event=>{
+      const button=event.target.closest('[data-user-status]');
+      if(!button)return;
+      const id=Number(button.dataset.userStatus);
+      const active=button.dataset.active!=='1';
+      button.disabled=true;
+      try {
+        await api('/users/'+id+'/status',{method:'POST',body:json({active})});
+        toast(active?'حساب کاربر فعال شد.':'حساب کاربر غیرفعال شد.','success');
+        await loadUsers();
+      } catch(error) {
+        toast(error.message,'error');
+        button.disabled=false;
+      }
+    });
+
+    $('#bankQuestionRows').addEventListener('click',async event=>{
+      const button=event.target.closest('[data-delete-bank-question]');
+      if(!button)return;
+      const id=Number(button.dataset.deleteBankQuestion);
+      if(!Number.isSafeInteger(id)||id<1||!confirm('این سؤال از بانک حذف شود؟'))return;
+      button.disabled=true;
+      try {
+        await api('/questions/'+id,{method:'DELETE'});
+        toast('سؤال از بانک حذف شد.','success');
+        await loadQuestionBank();
+      } catch(error) {
+        toast(error.message,'error');
+        button.disabled=false;
+      }
+    });
+
+    $('#promptSelect').addEventListener('change',()=>{
+      showPrompt(state.prompts.find(row=>row.slug===$('#promptSelect').value));
+    });
+    $('#promptForm').addEventListener('submit',async event=>{
+      event.preventDefault();
+      const form=$('#promptForm');
+      const data=payloadFromForm(form);
+      setBusy(form,true,'در حال ذخیره قالب...');
+      try {
+        const result=await api('/prompts',{method:'POST',body:json(data)});
+        setMessage('#promptMessage',result.message,'success');
+        await loadPrompts();
+      } catch(error) {
+        setMessage('#promptMessage',error.message,'error');
+      } finally {
+        setBusy(form,false);
+      }
+    });
+
     $('#historyList').addEventListener('click',async event=>{
       const button=event.target.closest('[data-history-copy]');
       if(!button)return;
@@ -625,6 +732,10 @@
     $('#modelSearch').addEventListener('input',()=>renderCatalog($('#page-models .catalog-tab.active')?.dataset.catalog||'models'));
     $('#loadUsage').addEventListener('click',loadUsage);
     $('#refreshHistory').addEventListener('click',loadHistory);
+    $('#refreshQuestionBank').addEventListener('click',loadQuestionBank);
+    $('#refreshUsers').addEventListener('click',loadUsers);
+    $('#bankQuestionSearch').addEventListener('input',()=>loadQuestionBank());
+    $('#userSearch').addEventListener('input',()=>loadUsers());
   }
 
   async function init() {
