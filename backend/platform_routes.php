@@ -327,7 +327,7 @@ if ($method === 'POST' && preg_match('#^/activities/([1-9][0-9]*)/submit$#',$pat
       )->execute([$activityId,(int)$student['id']]);
       $find=$pdo->prepare('SELECT id FROM activity_submissions WHERE activity_id=? AND student_id=?');
       $find->execute([$activityId,(int)$student['id']]);$submissionId=(int)$find->fetchColumn();
-      $allowed=$pdo->prepare('SELECT q.id,q.question_type,q.answer_json,aq.points FROM activity_questions aq JOIN question_bank q ON q.id=aq.question_id WHERE aq.activity_id=? AND q.id=? AND q.status=\'published\'');
+      $allowed=$pdo->prepare('SELECT q.id,q.question_type,q.answer_json,q.points FROM activity_questions aq JOIN question_bank q ON q.id=aq.question_id WHERE aq.activity_id=? AND q.id=? AND q.status=\'published\'');
       $save=$pdo->prepare(
         'INSERT INTO activity_answers(submission_id,question_id,answer_json,is_correct,awarded_points)
          VALUES(?,?,?,?,?) ON DUPLICATE KEY UPDATE answer_json=VALUES(answer_json),is_correct=VALUES(is_correct),awarded_points=VALUES(awarded_points),answered_at=UTC_TIMESTAMP()'
