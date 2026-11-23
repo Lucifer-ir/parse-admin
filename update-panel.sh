@@ -75,7 +75,15 @@ DB_NAME="$(sed -n 's/^DB_NAME=//p' /etc/parse-api.env | head -n1)"
 [[ "$DB_NAME" =~ ^[a-zA-Z0-9_]+$ ]] || { echo "Invalid DB_NAME in /etc/parse-api.env" >&2; exit 1; }
 
 if ! grep -q '^APP_ENCRYPTION_KEY=' /etc/parse-api.env; then
-  STORED_KEYS="$(mysql "$DB_NAME" -Nse "SELECT COUNT(*) FROM ai_provider_settings WHERE api_key_ciphertext IS NOT NULL AND api_key_ciphertext <> ''" 2>/dev/null || echo 0)"
+  if ! mysql "$DB_NAME" -Nse 'SELECT 1' >/dev/null 2>&1; then
+    echo "Cannot inspect the database safely to determine whether an encrypted AI key already exists. Restore database connectivity and retry." >&2
+    exit 1
+  fi
+  SETTINGS_TABLE="$(mysql "$DB_NAME" -Nse "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='ai_provider_settings'")"
+  STORED_KEYS=0
+  if [[ "$SETTINGS_TABLE" =~ ^[0-9]+$ ]] && (( SETTINGS_TABLE > 0 )); then
+    STORED_KEYS="$(mysql "$DB_NAME" -Nse "SELECT COUNT(*) FROM ai_provider_settings WHERE api_key_ciphertext IS NOT NULL AND api_key_ciphertext <> ''")"
+  fi
   if [[ "$STORED_KEYS" =~ ^[0-9]+$ ]] && (( STORED_KEYS > 0 )); then
     echo "APP_ENCRYPTION_KEY is missing but an encrypted AI key exists in the database. Restore the original key from backup; refusing to rotate it automatically." >&2
     exit 1
