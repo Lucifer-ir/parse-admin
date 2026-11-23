@@ -82,10 +82,10 @@ if [[ -z "$DB_PASS" ]]; then
 fi
 
 mysql <<SQL
-CREATE DATABASE IF NOT EXISTS `$DB_NAME` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE IF NOT EXISTS $DB_NAME CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER IF NOT EXISTS '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASS';
 ALTER USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASS';
-GRANT SELECT, INSERT, UPDATE, DELETE ON `$DB_NAME`.* TO '$DB_USER'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON $DB_NAME.* TO '$DB_USER'@'localhost';
 FLUSH PRIVILEGES;
 SQL
 mysql "$DB_NAME" < "$INSTALL_DIR/backend/schema.sql"
@@ -107,7 +107,7 @@ ENV
 chown root:www-data /etc/parse-api.env
 chmod 0640 /etc/parse-api.env
 
-echo "[6/9] Configuring encrypted-at-rest-permissions local database backups..."
+echo "[6/9] Configuring restricted-permission local database backups..."
 cat > /etc/parse-db-backup.cnf <<MYSQL_CNF
 [client]
 host=localhost
@@ -126,6 +126,7 @@ systemctl enable --now cron
 
 echo "[7/9] Creating first administrator if one does not already exist..."
 php "$INSTALL_DIR/backend/bin/create-admin.php"
+/usr/local/sbin/parse-admin-db-backup
 
 echo "[8/9] Configuring PHP-FPM and Nginx API virtual host..."
 cat > "/etc/php/$PHP_VERSION/fpm/conf.d/99-parse-api-security.ini" <<'PHPINI'
