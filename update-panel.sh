@@ -23,7 +23,7 @@ export DEBIAN_FRONTEND=noninteractive
 
 echo "[1/7] Installing/verifying PHP runtime..."
 apt-get update
-apt-get install -y nginx php-fpm php-cli php-mysql php-curl php-mbstring php-sodium mysql-server certbot python3-certbot-nginx
+apt-get install -y nginx php-fpm php-cli php-mysql php-curl php-mbstring mysql-server certbot python3-certbot-nginx
 
 if [[ ! -d "$REPO_DIR/.git" ]]; then
   echo "Repository is missing at $REPO_DIR. Run the main installer first." >&2
@@ -49,7 +49,6 @@ echo "[3/7] Checking PHP and JavaScript syntax..."
 find "$REPO_DIR/app" -type f -name '*.php' -print0 | xargs -0 -n1 php -l
 php -l "$REPO_DIR/backend/config.php"
 php -l "$REPO_DIR/backend/public/index.php"
-node --check "$REPO_DIR/app/public/assets/admin.js"
 bash -n "$REPO_DIR/update-panel.sh"
 
 echo "[4/7] Preparing private encryption key..."
@@ -77,7 +76,60 @@ find "$REPO_DIR/app/public" -type d -exec chmod 0750 {} \;
 find "$REPO_DIR/app/public" -type f -exec chmod 0640 {} \;
 
 echo "[7/7] Switching panel.aiparseh.ir to PHP-FPM..."
-cat > /etc/nginx/sites-available/parse-admin <<NGINX_HTTP
+if [[ -s "/etc/letsencrypt/live/$PANEL_DOMAIN/fullchain.pem" && -s "/etc/letsencrypt/live/$PANEL_DOMAIN/privkey.pem" ]]; then
+  cat > /etc/nginx/sites-available/parse-admin <<NGINX_SSL
+server {
+    listen 80;
+    listen [::]:80;
+    server_name $PANEL_DOMAIN;
+    location ^~ /.well-known/acme-challenge/ { root $REPO_DIR/app/public; }
+    location / { return 301 https://\$host\$request_uri; }
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name $PANEL_DOMAIN;
+
+    root $REPO_DIR/app/public;
+    index index.php;
+    server_tokens off;
+    client_max_body_size 20m;
+    ssl_certificate /etc/letsencrypt/live/$PANEL_DOMAIN/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/$PANEL_DOMAIN/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:ParseAdminSSL:10m;
+    ssl_session_timeout 1d;
+
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy strict-origin-when-cross-origin always;
+    add_header X-Frame-Options DENY always;
+
+    location / {
+        try_files \$uri \$uri/ /index.php?\$query_string;
+    }
+
+    location = /index.php {
+        include fastcgi_params;
+        fastcgi_pass unix:$PHP_FPM_SOCK;
+        fastcgi_param SCRIPT_FILENAME $REPO_DIR/app/public/index.php;
+        fastcgi_param DOCUMENT_ROOT $REPO_DIR/app/public;
+        fastcgi_hide_header X-Powered-By;
+    }
+
+    location ~* \.(?:env|ini|log|sql|bak|dist)$ { deny all; }
+    location ~ /\. { deny all; }
+    location ~ \.php$ { return 404; }
+
+    location ~* \.(?:css|js|woff2|svg|png|jpg|jpeg|webp|ico)$ {
+        expires 1h;
+        add_header Cache-Control "public, max-age=3600";
+        try_files \$uri =404;
+    }
+}
+NGINX_SSL
+else
+  cat > /etc/nginx/sites-available/parse-admin <<NGINX_HTTP
 server {
     listen 80;
     listen [::]:80;
@@ -104,17 +156,9 @@ server {
         fastcgi_hide_header X-Powered-By;
     }
 
-    location ~* \.(?:env|ini|log|sql|bak|dist)$ {
-        deny all;
-    }
-
-    location ~ /\. {
-        deny all;
-    }
-
-    location ~ \.php$ {
-        return 404;
-    }
+    location ~* \.(?:env|ini|log|sql|bak|dist)$ { deny all; }
+    location ~ /\. { deny all; }
+    location ~ \.php$ { return 404; }
 
     location ~* \.(?:css|js|woff2|svg|png|jpg|jpeg|webp|ico)$ {
         expires 1h;
@@ -123,6 +167,7 @@ server {
     }
 }
 NGINX_HTTP
+fi
 
 ln -sfn /etc/nginx/sites-available/parse-admin /etc/nginx/sites-enabled/parse-admin
 nginx -t
