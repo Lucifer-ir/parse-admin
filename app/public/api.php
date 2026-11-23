@@ -290,8 +290,8 @@ if ($method === 'POST' && $path === '/platform/activities') {
     $status=in_array(($body['status']??'draft'),['draft','published','closed'],true)?$body['status']:'draft';
     $pdo=app_db();$pdo->beginTransaction();
     try{
-      $pdo->prepare('INSERT INTO learning_activities(activity_type,title,description,subject,level,instructions,due_at,status,created_by) VALUES(?,?,?,?,?,?,?,?,?)')
-       ->execute([$type,$title,trim((string)($body['description']??''))?:null,trim((string)($body['subject']??''))?:null,trim((string)($body['level']??''))?:null,trim((string)($body['instructions']??''))?:null,$due,$status,(int)$admin['id']]);
+      $pdo->prepare('INSERT INTO learning_activities(activity_type,title,description,subject,level,track_id,instructions,due_at,status,created_by) VALUES(?,?,?,?,?,?,?,?,?,?)')
+       ->execute([$type,$title,trim((string)($body['description']??''))?:null,trim((string)($body['subject']??''))?:null,trim((string)($body['level']??''))?:null,!empty($body['track_id'])?(int)$body['track_id']:null,trim((string)($body['instructions']??''))?:null,$due,$status,(int)$admin['id']]);
       $activityId=(int)$pdo->lastInsertId();
       $valid=$pdo->prepare('SELECT id FROM question_bank WHERE id=? AND status=\\'published\\'');
       $link=$pdo->prepare('INSERT INTO activity_questions(activity_id,question_id,position) VALUES(?,?,?)');
@@ -455,8 +455,8 @@ if ($method === 'GET' && $path === '/platform/students') {
     }
     $sqlWhere = $where ? ' WHERE ' . implode(' AND ', $where) : '';
     $stmt = app_db()->prepare(
-        'SELECT id,username,student_code,phone,name,email,status,level,group_name,last_seen_at,last_seen_platform,created_at
-         FROM students' . $sqlWhere . ' ORDER BY id DESC LIMIT ? OFFSET ?'
+        'SELECT s.id,s.username,s.student_code,s.phone,s.name,s.email,s.status,s.level,s.group_name,s.track_id,t.track_title,t.course_title,t.level_code track_level,s.last_seen_at,s.last_seen_platform,s.created_at
+         FROM students s LEFT JOIN learning_tracks t ON t.id=s.track_id' . $sqlWhere.replace(/\b(username|name|phone|student_code|email|status)\b/g,'s.$1') . ' ORDER BY id DESC LIMIT ? OFFSET ?'
     );
     foreach ($params as $i => $value) $stmt->bindValue($i + 1, $value);
     $stmt->bindValue(count($params) + 1, $limit, PDO::PARAM_INT);
@@ -478,14 +478,15 @@ if ($method === 'POST' && $path === '/platform/students') {
     }
     try {
         $stmt = app_db()->prepare(
-            'INSERT INTO students(username,student_code,phone,name,email,password_hash,status,level,group_name)
-             VALUES(?,?,?,?,?,?,?, ?,?)'
+            'INSERT INTO students(username,student_code,phone,name,email,password_hash,status,level,group_name,track_id)
+             VALUES(?,?,?,?,?,?,?,?,?,?)'
         );
         $stmt->execute([
             $username, $code !== '' ? $code : null, $phone !== '' ? $phone : null, $name,
             trim((string)($body['email'] ?? '')) ?: null, password_hash($password, PASSWORD_DEFAULT),
             in_array(($body['status'] ?? 'active'), ['active','disabled','pending'], true) ? $body['status'] : 'active',
-            trim((string)($body['level'] ?? '')) ?: null, trim((string)($body['group_name'] ?? '')) ?: null
+            trim((string)($body['level'] ?? '')) ?: null, trim((string)($body['group_name'] ?? '')) ?: null,
+            !empty($body['track_id']) ? (int)$body['track_id'] : null
         ]);
     } catch (PDOException $e) {
         if ((string)$e->getCode() === '23000') app_json(409, ['error' => 'نام کاربری، کد دانش‌آموزی یا شماره تماس تکراری است.']);
@@ -518,7 +519,7 @@ if ($method === 'POST' && preg_match('#^/platform/students/([1-9][0-9]*)/passwor
 
 if ($method === 'POST' && preg_match('#^/platform/students/([1-9][0-9]*)$#', $path, $m)) {
     $id = (int)$m[1]; $body = app_request_json();
-    $allowed = ['name','phone','email','student_code','level','group_name'];
+    $allowed = ['name','phone','email','student_code','level','group_name','track_id'];
     $sets = []; $values = [];
     foreach ($allowed as $field) {
         if (array_key_exists($field, $body)) {
@@ -534,8 +535,8 @@ if ($method === 'POST' && preg_match('#^/platform/students/([1-9][0-9]*)$#', $pa
 
 if ($method === 'GET' && $path === '/platform/resources') {
     $rows = app_db()->query(
-        'SELECT id,resource_type,title,description,subject,level,content_text,file_url,original_filename,published,created_at,updated_at
-         FROM learning_resources ORDER BY id DESC'
+        'SELECT r.id,r.resource_type,r.title,r.description,r.subject,r.level,r.track_id,t.track_title,t.course_title,r.content_text,r.file_url,r.original_filename,r.published,r.created_at,r.updated_at
+         FROM learning_resources r LEFT JOIN learning_tracks t ON t.id=r.track_id ORDER BY r.id DESC'
     )->fetchAll();
     app_json(200, ['rows' => $rows]);
 }
@@ -572,13 +573,13 @@ if ($method === 'POST' && $path === '/platform/resources') {
         $fileUrl = '/api/resources/0/download';
     }
     $stmt = app_db()->prepare(
-        'INSERT INTO learning_resources(resource_type,title,description,subject,level,content_text,file_url,storage_path,original_filename,published,created_by)
-         VALUES(?,?,?,?,?,?,?,?,?,?,?)'
+        'INSERT INTO learning_resources(resource_type,title,description,subject,level,track_id,content_text,file_url,storage_path,original_filename,published,created_by)
+         VALUES(?,?,?,?,?,?,?,?,?,?,?,?)'
     );
     $stmt->execute([
         $type,$title,trim((string)($body['description'] ?? '')) ?: null,
         trim((string)($body['subject'] ?? '')) ?: null,
-        trim((string)($body['level'] ?? '')) ?: null,
+        trim((string)($body['level'] ?? '')) ?: null,!empty($body['track_id']) ? (int)$body['track_id'] : null,
         $content !== '' ? $content : null,$fileUrl,$storedPath,$originalName,
         !empty($body['published']) ? 1 : 0,(int)$admin['id']
     ]);
@@ -609,9 +610,9 @@ if ($method === 'GET' && $path === '/platform/questions') {
     $q = trim((string)($_GET['q'] ?? ''));
     $limit = min(200, max(1, (int)($_GET['limit'] ?? 100)));
     $stmt = app_db()->prepare(
-        'SELECT q.id,q.resource_id,q.target_student_id,s.name AS student_name,q.subject,q.level,q.skill,q.question_type,
+        'SELECT q.id,q.resource_id,q.target_student_id,q.track_id,t.track_title,s.name AS student_name,q.subject,q.level,q.skill,q.question_type,
                 q.question_text,q.options_json,q.answer_json,q.explanation,q.difficulty,q.points,q.status,q.created_at
-         FROM question_bank q LEFT JOIN students s ON s.id=q.target_student_id
+         FROM question_bank q LEFT JOIN students s ON s.id=q.target_student_id LEFT JOIN learning_tracks t ON t.id=q.track_id
          WHERE (?=\\'\\' OR q.question_text LIKE ? OR q.subject LIKE ?)
          ORDER BY q.id DESC LIMIT ?'
     );
@@ -643,11 +644,11 @@ if ($method === 'POST' && $path === '/platform/questions') {
             $difficulty = in_array(($item['difficulty'] ?? $body['difficulty'] ?? 'medium'), ['easy','medium','hard'], true)
                 ? ($item['difficulty'] ?? $body['difficulty'] ?? 'medium') : 'medium';
             $stmt = $pdo->prepare(
-                'INSERT INTO question_bank(resource_id,target_student_id,subject,level,skill,question_type,question_text,options_json,answer_json,explanation,difficulty,points,tags_json,status,created_by)
-                 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+                'INSERT INTO question_bank(resource_id,target_student_id,track_id,subject,level,skill,question_type,question_text,options_json,answer_json,explanation,difficulty,points,tags_json,status,created_by)
+                 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
             );
             $stmt->execute([
-                $resourceId,$studentId,$subject,
+                $resourceId,$studentId,!empty($body['track_id']) ? (int)$body['track_id'] : null,$subject,
                 trim((string)($item['level'] ?? $body['level'] ?? '')) ?: null,$skill,$qType,
                 trim((string)$item['question_text']),platform_json_value($options),
                 platform_json_value($item['correct_answer'] ?? $item['answer'] ?? null),
@@ -722,9 +723,9 @@ if ($method === 'POST' && $path === '/platform/questions/generate') {
         if ($itemType === 'multiple_choice' && (!is_array($options) || count($options) !== 4)) {
           throw new InvalidArgumentException('مدل برای سؤال چندگزینه‌ای دقیقاً چهار گزینه تولید نکرد.');
         }
-        $stmt=$pdo->prepare('INSERT INTO question_bank(resource_id,target_student_id,subject,level,skill,question_type,question_text,options_json,answer_json,explanation,difficulty,points,tags_json,status,created_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
+        $stmt=$pdo->prepare('INSERT INTO question_bank(resource_id,target_student_id,track_id,subject,level,skill,question_type,question_text,options_json,answer_json,explanation,difficulty,points,tags_json,status,created_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
         $stmt->execute([
-          $resourceId,$targetStudentId,$subject,$level,
+          $resourceId,$targetStudentId,!empty($body['track_id']) ? (int)$body['track_id'] : null,$subject,$level,
           in_array(($body['skill'] ?? 'general'),['listening','speaking','reading','writing','grammar','vocabulary','general'],true)?$body['skill']:'general',
           $itemType,trim((string)$item['question_text']),platform_json_value($options),
           platform_json_value($item['correct_answer'] ?? null),trim((string)($item['explanation'] ?? '')) ?: null,
@@ -756,7 +757,7 @@ if ($method === 'DELETE' && preg_match('#^/platform/questions/([1-9][0-9]*)$#', 
 
 if ($method === 'GET' && $path === '/platform/exams') {
     $rows=app_db()->query(
-      'SELECT e.id,e.title,e.subject,e.level,e.duration_minutes,e.starts_at,e.ends_at,e.status,e.passing_score,
+      'SELECT e.id,e.title,e.subject,e.level,e.track_id,e.duration_minutes,e.starts_at,e.ends_at,e.status,e.passing_score,
               s.name AS student_name,COUNT(eq.question_id) AS question_count,COUNT(a.id) AS attempt_count
        FROM exams e LEFT JOIN students s ON s.id=e.target_student_id
        LEFT JOIN exam_questions eq ON eq.exam_id=e.id
@@ -777,8 +778,8 @@ if ($method === 'POST' && $path === '/platform/exams') {
     $status=in_array(($body['status']??'draft'),['draft','published','closed'],true)?$body['status']:'draft';
     $pdo=app_db();$pdo->beginTransaction();
     try{
-      $pdo->prepare('INSERT INTO exams(title,description,subject,level,duration_minutes,starts_at,ends_at,target_student_id,shuffle_questions,shuffle_options,show_result,passing_score,status,created_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-        ->execute([$title,trim((string)($body['description']??''))?:null,trim((string)($body['subject']??''))?:null,trim((string)($body['level']??''))?:null,$duration,$start,$end,!empty($body['target_student_id'])?(int)$body['target_student_id']:null,!empty($body['shuffle_questions'])?1:0,!empty($body['shuffle_options'])?1:0,!empty($body['show_result'])?1:0,max(0,min(100,(float)($body['passing_score']??50))),$status,(int)$admin['id']]);
+      $pdo->prepare('INSERT INTO exams(title,description,subject,level,track_id,duration_minutes,starts_at,ends_at,target_student_id,shuffle_questions,shuffle_options,show_result,passing_score,status,created_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+        ->execute([$title,trim((string)($body['description']??''))?:null,trim((string)($body['subject']??''))?:null,trim((string)($body['level']??''))?:null,!empty($body['track_id'])?(int)$body['track_id']:null,$duration,$start,$end,!empty($body['target_student_id'])?(int)$body['target_student_id']:null,!empty($body['shuffle_questions'])?1:0,!empty($body['shuffle_options'])?1:0,!empty($body['show_result'])?1:0,max(0,min(100,(float)($body['passing_score']??50))),$status,(int)$admin['id']]);
       $examId=(int)$pdo->lastInsertId();
       $validStmt=$pdo->prepare('SELECT id FROM question_bank WHERE id=?');
       $link=$pdo->prepare('INSERT INTO exam_questions(exam_id,question_id,position,points) VALUES(?,?,?,?)');
