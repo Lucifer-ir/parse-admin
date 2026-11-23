@@ -4,7 +4,7 @@
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
   const csrf = $('meta[name="csrf-token"]')?.content || '';
-  const state = { catalogs: {}, lastQuestionOutput: '', bootstrap: null, currentPage: 'dashboard', users: [], questions: [], prompts: [], students: [], resources: [], exams: [], attempts: [], platformSettings: {} };
+  const state = { catalogs: {}, lastQuestionOutput: '', bootstrap: null, currentPage: 'dashboard', users: [], questions: [], prompts: [], students: [], resources: [], exams: [], attempts: [], tracks: [], activities: [], activitySubmissions: [], platformSettings: {} };
   const number = value => Number(value || 0).toLocaleString('fa-IR');
   const money = value => Number(value || 0).toLocaleString('fa-IR', { maximumFractionDigits: 2 });
   const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -70,7 +70,7 @@
       review:'بررسی و ویرایش متن', playground:'AI Playground', multimodal:'تصویر و صوت',
       structured:'تصمیم و Embedding', batches:'Batch و رسید درخواست',
       usage:'مصرف و هزینه‌ها', history:'تاریخچه تولید', settings:'تنظیمات اتصال',
-      'question-bank':'بانک هوشمند سؤال', users:'مدیریت مدیران', prompts:'قالب‌های دستور AI', students:'دانش‌آموزان', resources:'کتاب‌ها و جزوه‌ها', exams:'آزمون‌ها و زمان‌بندی', attempts:'پاسخ‌نامه‌ها و نمرات', monitoring:'مانیتورینگ اپ'
+      'question-bank':'بانک هوشمند سؤال', users:'مدیریت مدیران', prompts:'قالب‌های دستور AI', students:'دانش‌آموزان', resources:'کتاب‌ها و جزوه‌ها', exams:'آزمون‌ها و زمان‌بندی', attempts:'پاسخ‌نامه‌ها و نمرات', monitoring:'مانیتورینگ اپ', tracks:'زبان و مسیر آموزشی', activities:'تمرین‌ها و تکالیف', 'activity-submissions':'پاسخ تمرین‌ها'
     };
     state.currentPage = page;
     $$('.page-view').forEach(node => node.classList.toggle('active', node.id === 'page-' + page));
@@ -89,6 +89,9 @@
     if (page === 'exams') { loadExams(); loadStudents(); }
     if (page === 'attempts') loadAttempts();
     if (page === 'monitoring') loadMonitoring();
+    if (page === 'tracks') loadTracks();
+    if (page === 'activities') { loadActivities(); loadTracks(); loadStudents(); loadPlatformQuestionBank(); }
+    if (page === 'activity-submissions') loadActivitySubmissions();
     if (page === 'question-bank') { loadPlatformQuestionBank(); loadResources(); loadStudents(); }
     if (page === 'questions' || page === 'practice' || page === 'review' || page === 'playground') {
       if (!state.catalogs.models) loadCatalog('models');
@@ -795,6 +798,72 @@
 
   function questionTypeLabel(type) {
     return ({multiple_choice:'چهارگزینه‌ای',written:'تشریحی',true_false:'درست / نادرست',fill_blank:'جای خالی',matching:'وصل‌کردنی',ordering:'مرتب‌سازی',listening:'شنیداری',speaking:'گفتاری'})[type] || type || '—';
+  }
+
+
+  async function loadTracks() {
+    try {
+      const result = await api('/platform/tracks');
+      state.tracks = result.rows || [];
+      if ($('#trackRows')) {
+        $('#trackRows').innerHTML = state.tracks.length ? state.tracks.map(track =>
+          '<tr><td>'+escapeHtml(track.language_name)+' <small dir="ltr">'+escapeHtml(track.language_code)+'</small></td><td>'+escapeHtml(track.track_title)+'</td><td>'+escapeHtml(track.course_title)+'</td><td>'+escapeHtml(track.level_code)+'</td><td><span class="table-status '+(Number(track.active)?'ok':'bad')+'">'+(Number(track.active)?'فعال':'غیرفعال')+'</span></td><td><button class="button button-secondary" data-track-status="'+Number(track.id)+'" data-active="'+Number(track.active)+'">'+(Number(track.active)?'غیرفعال‌سازی':'فعال‌سازی')+'</button></td></tr>'
+        ).join('') : '<tr><td colspan="6" class="empty-cell">هنوز مسیر آموزشی تعریف نشده است.</td></tr>';
+      }
+      const options='<option value="">بدون محدودیت مسیر</option>'+state.tracks.filter(t=>Number(t.active)).map(t=>'<option value="'+Number(t.id)+'">'+escapeHtml(t.language_name+' · '+t.track_title+' · '+t.course_title+' · '+t.level_code)+'</option>').join('');
+      ['#studentCreateForm [name="track_id"]','#resourceCreateForm [name="track_id"]','#structuredQuestionForm [name="track_id"]','#examCreateForm [name="track_id"]','#activityTrack'].forEach(selector=>{
+        const select=$(selector);
+        if(select){const previous=select.value;select.innerHTML=options;if(previous)select.value=previous;}
+      });
+    } catch(error) {
+      if($('#trackRows'))$('#trackRows').innerHTML='<tr><td colspan="6" class="empty-cell">'+escapeHtml(error.message)+'</td></tr>';
+      toast(error.message,'error');
+    }
+  }
+
+  async function loadActivities() {
+    try {
+      const result=await api('/platform/activities');
+      state.activities=result.rows||[];
+      if($('#activityRows'))$('#activityRows').innerHTML=state.activities.length?state.activities.map(a=>
+        '<tr><td>'+escapeHtml(a.title)+'</td><td>'+escapeHtml(a.activity_type==='assignment'?'تکلیف':'تمرین')+'</td><td>'+escapeHtml([a.subject,a.level].filter(Boolean).join(' / ')||'—')+'</td><td>'+number(a.question_count)+'</td><td>'+number(a.student_count)+'</td><td>'+number(a.submitted_count)+'</td><td>'+escapeHtml(faDate(a.due_at))+'</td><td><span class="table-status '+(a.status==='published'?'ok':'bad')+'">'+escapeHtml(statusLabel(a.status))+'</span></td><td><button class="button button-secondary" data-activity-status="'+Number(a.id)+'" data-status="'+escapeHtml(a.status)+'">'+(a.status==='published'?'بستن':'انتشار')+'</button></td></tr>'
+      ).join(''):'<tr><td colspan="9" class="empty-cell">هنوز تمرین یا تکلیفی ساخته نشده است.</td></tr>';
+    } catch(error) {
+      if($('#activityRows'))$('#activityRows').innerHTML='<tr><td colspan="9" class="empty-cell">'+escapeHtml(error.message)+'</td></tr>';
+      toast(error.message,'error');
+    }
+  }
+
+  async function loadActivitySubmissions() {
+    try {
+      const result=await api('/platform/activity-submissions');
+      state.activitySubmissions=result.rows||[];
+      if($('#activitySubmissionRows'))$('#activitySubmissionRows').innerHTML=state.activitySubmissions.length?state.activitySubmissions.map(s=>
+        '<tr><td>'+escapeHtml(s.student_name+' · '+s.username)+'</td><td>'+escapeHtml(s.activity_title)+'</td><td>'+number(s.answered_count)+' / '+number(s.question_count)+'</td><td>'+escapeHtml(faDate(s.submitted_at))+'</td><td>'+escapeHtml(s.score===null?'—':s.score+' / '+s.total_points)+'</td><td><span class="table-status '+(s.status==='reviewed'?'ok':'bad')+'">'+escapeHtml(statusLabel(s.status))+'</span></td><td><button class="button button-secondary" data-activity-submission-detail="'+Number(s.id)+'">مشاهده و تصحیح</button></td></tr>'
+      ).join(''):'<tr><td colspan="7" class="empty-cell">هنوز پاسخی برای تمرین‌ها ثبت نشده است.</td></tr>';
+    } catch(error) {
+      if($('#activitySubmissionRows'))$('#activitySubmissionRows').innerHTML='<tr><td colspan="7" class="empty-cell">'+escapeHtml(error.message)+'</td></tr>';
+      toast(error.message,'error');
+    }
+  }
+
+  async function loadActivitySubmissionDetail(id) {
+    try {
+      const result=await api('/platform/activity-submissions/'+Number(id));
+      const submission=result.submission, answers=result.answers||[];
+      $('#activitySubmissionDetailPanel').hidden=false;
+      $('#activitySubmissionDetailTitle').textContent=submission.student_name+' · '+submission.activity_title;
+      $('#activitySubmissionDetailMeta').textContent='وضعیت: '+statusLabel(submission.status)+' | نمره: '+(submission.score??'—')+' از '+(submission.total_points??'—');
+      $('#activitySubmissionAnswers').innerHTML=answers.map(row=>{
+        let response=row.student_answer||'—';
+        try{response=JSON.stringify(JSON.parse(response),null,2);}catch{}
+        let options=null;
+        try{options=row.options_json?JSON.parse(row.options_json):null;}catch{}
+        const key=row.correct_answer?'<details><summary>پاسخ معیار</summary><pre>'+escapeHtml(row.correct_answer)+'</pre></details>':'';
+        const manual=['written','speaking','listening','matching'].includes(row.question_type)||row.is_correct===null;
+        return '<article class="attempt-answer"><h4>'+escapeHtml(row.question_text)+'</h4><small>'+escapeHtml(questionTypeLabel(row.question_type))+' · بارم '+escapeHtml(row.points)+'</small><div class="answer-columns"><div><b>پاسخ دانش‌آموز</b><pre>'+escapeHtml(response)+'</pre></div><div><b>گزینه‌ها</b><pre>'+escapeHtml(options?formatObject(options):'—')+'</pre></div></div>'+key+(manual?'<form class="grade-activity-answer-form" data-answer-id="'+Number(row.id)+'"><label>نمره<input class="input" name="awarded_points" type="number" min="0" max="'+Number(row.points)+'" step="0.25" value="'+Number(row.awarded_points||0)+'"></label><label>بازخورد<textarea class="input textarea" name="teacher_feedback" rows="2">'+escapeHtml(row.teacher_feedback||'')+'</textarea></label><button class="button button-primary" type="submit">ثبت تصحیح</button></form>':'<p class="muted-label">تصحیح خودکار · '+(Number(row.is_correct)===1?'درست':Number(row.is_correct)===0?'نادرست':'در انتظار')+'</p>')+'</article>';
+      }).join('')||'<div class="empty-state">پاسخی ثبت نشده است.</div>';
+    } catch(error){toast(error.message,'error');}
   }
 
   async function loadStudents() {
