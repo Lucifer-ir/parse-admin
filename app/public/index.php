@@ -147,6 +147,10 @@ $csrf=app_csrf();
       <div class="nav-caption">گزارش و پیکربندی</div>
       <button class="nav-item" data-page="usage"><i>◷</i><span>مصرف و هزینه‌ها</span></button>
       <button class="nav-item" data-page="history"><i>▧</i><span>تاریخچه تولید</span></button>
+      <div class="nav-caption">مدیریت محتوا و کاربران</div>
+      <button class="nav-item" data-page="question-bank"><i>▤</i><span>بانک سؤال‌ها</span></button>
+      <button class="nav-item" data-page="users"><i>♙</i><span>مدیریت کاربران</span></button>
+      <button class="nav-item" data-page="prompts"><i>✎</i><span>قالب‌های دستور AI</span></button>
       <button class="nav-item" data-page="settings"><i>⚙</i><span>تنظیمات اتصال</span></button>
     </nav>
     <div class="sidebar-bottom"><div class="admin-mini"><div class="avatar"><?= app_e(mb_strtoupper(mb_substr((string)$admin['email'],0,1))) ?></div><div><b><?= app_e($admin['email']) ?></b><small>مدیر سیستم</small></div></div><form method="post" action="/"><input type="hidden" name="action" value="logout"><input type="hidden" name="_csrf" value="<?= app_e($csrf) ?>"><button class="logout-button" type="submit">↪ خروج امن</button></form></div>
@@ -244,6 +248,47 @@ $csrf=app_csrf();
     <section class="page-view" id="page-history">
       <div class="page-heading"><div><div class="eyebrow">GENERATION LIBRARY</div><h1>تاریخچه تولید</h1><p>خروجی‌های ذخیره‌شده سؤال، تمرین، بررسی متن و گفت‌وگو.</p></div><button class="button button-ghost" id="refreshHistory">↻ به‌روزرسانی</button></div>
       <div id="historyList" class="history-list"><div class="empty-state">در حال دریافت تاریخچه...</div></div>
+    </section>
+
+    <section class="page-view" id="page-question-bank">
+      <div class="page-heading"><div><div class="eyebrow">CONTENT MANAGEMENT</div><h1>بانک سؤال‌ها</h1><p>جست‌وجو و مدیریت سؤال‌های ذخیره‌شده از تولید هوش مصنوعی.</p></div><button class="button button-ghost" id="refreshQuestionBank">↻ به‌روزرسانی</button></div>
+      <section class="panel-card table-panel">
+        <div class="filter-row"><input id="bankQuestionSearch" class="input" placeholder="جست‌وجوی سؤال، درس یا پایه..."><span id="bankQuestionCount" class="muted-label"></span></div>
+        <div class="table-scroll"><table><thead><tr><th>شناسه</th><th>متن سؤال</th><th>درس</th><th>پایه</th><th>منبع</th><th>تاریخ</th><th>عملیات</th></tr></thead><tbody id="bankQuestionRows"><tr><td colspan="7" class="empty-cell">در حال دریافت...</td></tr></tbody></table></div>
+      </section>
+    </section>
+
+    <section class="page-view" id="page-users">
+      <div class="page-heading"><div><div class="eyebrow">USER & ACCESS MANAGEMENT</div><h1>مدیریت کاربران</h1><p>مشاهده حساب‌ها و کنترل وضعیت فعال یا غیرفعال آن‌ها.</p></div><button class="button button-ghost" id="refreshUsers">↻ به‌روزرسانی</button></div>
+      <section class="panel-card table-panel">
+        <div class="filter-row"><input id="userSearch" class="input" placeholder="جست‌وجوی ایمیل کاربر..."><span id="userCount" class="muted-label"></span></div>
+        <div class="table-scroll"><table><thead><tr><th>شناسه</th><th>ایمیل</th><th>نقش</th><th>وضعیت</th><th>تاریخ عضویت</th><th>عملیات</th></tr></thead><tbody id="userRows"><tr><td colspan="6" class="empty-cell">در حال دریافت...</td></tr></tbody></table></div>
+      </section>
+      <p class="notice">برای جلوگیری از قفل‌شدن پنل، غیرفعال‌کردن حساب مدیر فعلی مجاز نیست.</p>
+    </section>
+
+    <section class="page-view" id="page-prompts">
+      <div class="page-heading"><div><div class="eyebrow">AI PROMPT MANAGEMENT</div><h1>قالب‌های دستور هوش مصنوعی</h1><p>دستور سیستم تولید سؤال، تمرین و بررسی متن را بدون تغییر کد مدیریت کن.</p></div></div>
+      <div class="workspace-grid">
+        <section class="panel-card form-panel">
+          <label>قالب موردنظر<select class="input" id="promptSelect"></select></label>
+          <div class="security-note" id="promptMeta">قالب دستور انتخاب نشده است.</div>
+          <form id="promptForm">
+            <input type="hidden" name="slug" id="promptSlug">
+            <label>System Prompt<textarea class="input textarea" name="system_prompt" id="promptBody" rows="17" required></textarea></label>
+            <label class="check-row"><input type="checkbox" name="enabled" id="promptEnabled" checked><span>استفاده از این قالب در تولید جدید فعال باشد</span></label>
+            <button class="button button-primary full-button" type="submit">ذخیره قالب دستور</button>
+            <div class="form-message" id="promptMessage"></div>
+          </form>
+        </section>
+        <section class="panel-card result-panel">
+          <div class="panel-heading"><div><h3>راهنمای قالب‌ها</h3><p>این دستور به‌عنوان System Prompt درخواست AI ارسال می‌شود.</p></div></div>
+          <div class="security-row"><i>✧</i><span><b>Question</b><small>تولید سؤال با پاسخ صحیح و توضیح</small></span></div>
+          <div class="security-row"><i>▤</i><span><b>Practice</b><small>طراحی تمرین مرحله‌ای و قابل ارزیابی</small></span></div>
+          <div class="security-row"><i>≋</i><span><b>Review</b><small>تحلیل و بازنویسی متن</small></span></div>
+          <div class="notice">تغییر قالب فقط روی درخواست‌های جدید اثر دارد. خروجی‌های قبلی در تاریخچه ثابت می‌مانند.</div>
+        </section>
+      </div>
     </section>
 
     <section class="page-view" id="page-settings">
