@@ -196,6 +196,7 @@ function ai_catalog(array $admin, string $kind): never
         'decisions' => '/decisions/models',
         'images' => '/images',
         'audio' => '/audio/models',
+        'speech' => '/audio/speech',
         'embeddings' => '/embeddings/models',
     ];
     if (!isset($routes[$kind])) app_json(400, ['error' => 'نوع کاتالوگ معتبر نیست.']);
