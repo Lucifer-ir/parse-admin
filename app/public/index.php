@@ -272,7 +272,7 @@ $assetVersion = max(
           <label>فایل متنی / جزوه<select class="input" name="resource_id" id="questionResource" required><option value="">انتخاب منبع آموزشی</option></select></label>
           <label>مدل<select class="input model-select" name="model" data-kind="models" required><option value="">انتخاب مدل</option></select></label>
           <div class="form-two"><label>درس / رشته<input class="input" name="subject" placeholder="مثلاً زبان انگلیسی" required></label><label>سطح<input class="input" name="level" placeholder="مثلاً A2 / پایه هفتم"></label></div>
-          <label>مسیر آموزشی<select class="input" name="track_id"><option value="">بدون مسیر مشخص</option></select></label>
+          <label>مسیر آموزشی<select class="input" name="track_id" required><option value="">انتخاب مسیر، زبان، ترم و سطح</option></select></label>
           <div class="form-two"><label>مهارت<select class="input" name="skill"><option value="general">عمومی</option><option value="listening">Listening</option><option value="speaking">Speaking</option><option value="reading">Reading</option><option value="writing">Writing</option><option value="grammar">Grammar</option><option value="vocabulary">Vocabulary</option></select></label><label>نوع سؤال<select class="input" name="question_type"><option value="multiple_choice">چهارگزینه‌ای</option><option value="written">تشریحی</option><option value="true_false">درست / نادرست</option><option value="fill_blank">جای خالی</option><option value="matching">وصل‌کردنی</option><option value="ordering">مرتب‌سازی</option><option value="listening">شنیداری</option><option value="speaking">گفتاری</option></select></label></div>
           <div class="form-two"><label>تعداد سؤال<input class="input" type="number" name="count" value="10" min="1" max="40"></label><label>سطح دشواری<select class="input" name="difficulty"><option value="easy">آسان</option><option value="medium" selected>متوسط</option><option value="hard">سخت</option></select></label></div>
           <label>اختصاص به دانش‌آموز<select class="input" name="target_student_id" id="questionTargetStudent"><option value="">بانک عمومی</option></select></label>
@@ -309,7 +309,7 @@ $assetVersion = max(
         </form>
         <section class="panel-card result-panel"><h3>راهنمای حساب</h3><div class="security-row"><i>✓</i><span><b>ورود با نام کاربری</b><small>دانش‌آموز با نام کاربری و رمز تعیین‌شده در اپ وارد می‌شود.</small></span></div><div class="security-row"><i>✓</i><span><b>تغییر یا بازیابی رمز</b><small>مدیر می‌تواند رمز جدید تعیین کند؛ نشست‌های قبلی باطل می‌شوند.</small></span></div><div class="security-row"><i>✓</i><span><b>سطح و گروه</b><small>تخصیص محتوا و آزمون‌ها بر اساس سطح و گروه قابل انجام است.</small></span></div></section>
       </div>
-      <section class="panel-card table-panel"><div class="filter-row"><input id="studentSearch" class="input" placeholder="جست‌وجوی نام، نام کاربری، شماره یا کد..."><select id="studentStatusFilter" class="input"><option value="">همه وضعیت‌ها</option><option value="active">فعال</option><option value="disabled">غیرفعال</option><option value="pending">در انتظار</option></select><span id="studentCount" class="muted-label"></span></div><div class="table-scroll"><table><thead><tr><th>شناسه</th><th>نام</th><th>نام کاربری</th><th>سطح / گروه</th><th>آخرین فعالیت</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody id="studentRows"><tr><td colspan="7" class="empty-cell">در حال دریافت...</td></tr></tbody></table></div></section>
+      <section class="panel-card table-panel"><div class="filter-row"><input id="studentSearch" class="input" placeholder="جست‌وجوی نام، نام کاربری، شماره یا کد..."><select id="studentStatusFilter" class="input"><option value="">همه وضعیت‌ها</option><option value="active">فعال</option><option value="disabled">غیرفعال</option><option value="pending">در انتظار</option></select><span id="studentCount" class="muted-label"></span></div><div class="table-scroll"><table><thead><tr><th>شناسه</th><th>نام</th><th>نام کاربری</th><th>مسیر / زبان / ترم / سطح / گروه</th><th>آخرین فعالیت</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody id="studentRows"><tr><td colspan="7" class="empty-cell">در حال دریافت...</td></tr></tbody></table></div></section>
       <dialog class="panel-card" id="studentEditDialog" style="width:min(560px,calc(100% - 28px));border:0;border-radius:16px;padding:24px;box-shadow:0 24px 80px #102b2540">
         <form id="studentEditForm" class="form-panel">
           <div class="panel-heading"><div><h3>ویرایش دانش‌آموز</h3><p id="studentEditMeta" class="muted-label"></p></div></div>
@@ -347,8 +347,9 @@ $assetVersion = max(
       <div class="workspace-grid">
         <form class="panel-card form-panel" id="examCreateForm"><h3>آزمون جدید</h3>
           <label>عنوان آزمون<input class="input" name="title" required></label>
-          <div class="form-two"><label>درس<input class="input" name="subject"></label><label>سطح<input class="input" name="level"></label></div>
+          <label>درس<input class="input" name="subject"></label>
           <label>مسیر آموزشی<select class="input" name="track_id"><option value="">بدون محدودیت مسیر</option></select></label>
+          <p class="muted-label">سطح آزمون از سطح مسیر آموزشی انتخاب‌شده تعیین می‌شود.</p>
           <div class="form-two"><label>مدت آزمون (دقیقه)<input class="input" name="duration_minutes" type="number" min="1" max="600" value="30"></label><label>نمره قبولی (%)<input class="input" name="passing_score" type="number" min="0" max="100" value="50"></label></div>
           <div class="form-two"><label>شروع (اختیاری)<input class="input" name="starts_at" type="datetime-local"></label><label>پایان (اختیاری)<input class="input" name="ends_at" type="datetime-local"></label></div>
           <label>اختصاص به دانش‌آموز<select class="input" name="target_student_id" id="examTargetStudent"><option value="">تمام دانش‌آموزان سطح انتخاب‌شده</option></select></label>
@@ -396,7 +397,7 @@ $assetVersion = max(
         </form>
         <div class="table-scroll"><table><thead><tr><th>نوع کلاس</th><th>شناسه</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody id="classTypeRows"></tbody></table></div>
       </section>
-      <section class="panel-card table-panel"><div class="table-scroll"><table><thead><tr><th>زبان</th><th>رشته</th><th>دوره</th><th>سطح</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody id="trackRows"><tr><td colspan="6" class="empty-cell">در حال دریافت...</td></tr></tbody></table></div></section>
+      <section class="panel-card table-panel"><div class="table-scroll"><table><thead><tr><th>زبان</th><th>رشته</th><th>دوره</th><th>سطح</th><th>نوع کلاس</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody id="trackRows"><tr><td colspan="6" class="empty-cell">در حال دریافت...</td></tr></tbody></table></div></section>
     </section>
 
     <section class="page-view" id="page-activities">
@@ -405,8 +406,9 @@ $assetVersion = max(
         <form class="panel-card form-panel" id="activityCreateForm"><h3>ساخت تمرین جدید</h3>
           <label>عنوان<input class="input" name="title" required></label>
           <div class="form-two"><label>نوع<select class="input" name="activity_type"><option value="practice">تمرین</option><option value="assignment">تکلیف</option></select></label><label>وضعیت<select class="input" name="status"><option value="draft">پیش‌نویس</option><option value="published">انتشار</option></select></label></div>
-          <div class="form-two"><label>درس<input class="input" name="subject"></label><label>سطح<input class="input" name="level"></label></div>
+          <label>درس<input class="input" name="subject"></label>
           <label>مسیر آموزشی<select class="input" name="track_id" id="activityTrack"><option value="">بدون محدودیت مسیر</option></select></label>
+          <p class="muted-label">سطح تمرین و گروه هدف از مسیر انتخاب‌شده دریافت می‌شود.</p>
           <label>دانش‌آموز مشخص (اختیاری)<select class="input" name="target_student_id" id="activityTargetStudent"><option value="">تخصیص بر اساس سطح / مسیر</option></select></label>
           <label>مهلت انجام<input class="input" name="due_at" type="datetime-local"></label>
           <label>شناسه سؤال‌های منتشرشده در بانک (با کاما جدا شود)<input class="input" name="question_ids" placeholder="12, 18, 24" required></label>
