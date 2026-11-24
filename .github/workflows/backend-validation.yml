@@ -1,32 +1,98 @@
-name: PHP and AI console validation
+name: Parse Admin CI
 
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: parse-admin-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  lint:
+  php:
+    name: PHP lint (8.2 / 8.3)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.2', '8.3']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: pdo, pdo_mysql, curl, mbstring, sodium
+          coverage: none
+      - name: PHP syntax
+        run: find app backend -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Validate required extensions
+        run: php -r 'foreach(["pdo_mysql","curl","mbstring","sodium"] as $e){if(!extension_loaded($e)){fwrite(STDERR,"Missing extension: $e\n");exit(1);}}'
+      - name: Secret pattern scan
+        run: |
+          if grep -RInE '(AKIA[0-9A-Z]{16}|-----BEGIN (RSA|OPENSSH|EC) PRIVATE KEY-----)' app backend; then
+            echo "Potential credential material detected"
+            exit 1
+          fi
+
+  frontend:
+    name: JavaScript validation
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up PHP
-        uses: shivammathur/setup-php@v2
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          php-version: '8.3'
-          extensions: pdo_mysql, curl, mbstring, sodium
+          node-version: '22'
+      - run: node --check app/public/assets/admin.js
+      - name: Conflict markers and whitespace
+        run: |
+          git diff --check
+          if grep -RInE '^(<<<<<<<|=======|>>>>>>>)' app backend; then exit 1; fi
 
-      - name: PHP syntax check
-        run: find app backend -type f -name '*.php' -print0 | xargs -0 -n1 php -l
-
-      - name: JavaScript syntax check
-        run: node --check app/public/assets/admin.js
-
-      - name: Shell syntax check
+  shell:
+    name: Shell scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bash syntax
         run: bash -n install.sh && bash -n update-panel.sh && bash -n backend/bin/backup-db.sh
+      - name: ShellCheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+          shellcheck -S warning install.sh update-panel.sh backend/bin/backup-db.sh
+
+  sql:
+    name: SQL static checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check schema and migration files
+        run: |
+          test -s backend/schema.sql
+          find backend/migrations -type f -name '*.sql' -print0 | xargs -0 -n1 test -s
+      - name: Flag destructive migration statements
+        run: |
+          if grep -RInE '(^|[[:space:]])(DROP[[:space:]]+(DATABASE|TABLE)|TRUNCATE[[:space:]]+TABLE)([[:space:]]|;)' backend/migrations; then
+            echo "Destructive SQL needs review"
+            exit 1
+          fi
+
+  packaging:
+    name: Deployment package smoke checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check required files
+        run: |
+          for f in app/bootstrap.php app/public/index.php app/public/api.php app/public/assets/admin.js app/public/assets/admin.css backend/config.php backend/schema.sql backend/public/index.php backend/platform_routes.php install.sh update-panel.sh; do
+            test -s "$f" || { echo "Missing: $f"; exit 1; }
+          done
+          test -d app/public/pages
+          test -d backend/migrations
+          test -d backend/bin
