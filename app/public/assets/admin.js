@@ -1212,7 +1212,6 @@
         if(del){if(!confirm('منبع و فایل آن حذف شود؟'))return;await api('/platform/resources/'+Number(del.dataset.resourceDelete),{method:'DELETE',body:'{}'});await loadResources();}
       }catch(error){toast(error.message,'error');}
     });
-    }
 
     $('#bankQuestionRows').addEventListener('click',async event=>{
       const publish=event.target.closest('[data-question-publish]'), del=event.target.closest('[data-question-delete]');
@@ -1351,6 +1350,8 @@
         button.disabled=false;
       }
     });
+
+    }
 
     $('#bankQuestionRows').addEventListener('click',async event=>{
       const button=event.target.closest('[data-delete-bank-question]');
