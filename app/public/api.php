@@ -959,7 +959,44 @@ if ($method === 'POST' && $path === '/platform/questions/generate') {
     $subject = trim((string)($body['subject'] ?? 'عمومی'));
     $trackId = !empty($body['track_id']) ? (int)$body['track_id'] : null;
     $level = platform_track_level(app_db(), $trackId) ?? '';
-    $languageCode='fa'; $languageName='فارسی';\n    if($trackId){$langStmt=app_db()->prepare('SELECT l.language_code,l.language_name,l.native_name FROM learning_tracks t LEFT JOIN learning_languages l ON l.language_code=t.language_code WHERE t.id=? LIMIT 1');$langStmt->execute([$trackId]);$langRow=$langStmt->fetch();if($langRow){$languageCode=(string)($langRow['language_code']??'fa');$languageName=(string)($langRow['native_name']?:($langRow['language_name']?:$languageCode));}}\n    $outputLanguage = match(strtolower($languageCode)){ 'en'=>'English','fr'=>'French','de'=>'German','es'=>'Spanish','it'=>'Italian','pt'=>'Portuguese','ru'=>'Russian','tr'=>'Turkish','ar'=>'Arabic','fa'=>'Persian','ja'=>'Japanese','zh'=>'Chinese', default=>$languageName };
+    $languageCode = 'fa';
+    $languageName = 'فارسی';
+
+    if ($trackId) {
+        $languageStatement = app_db()->prepare(
+            'SELECT l.language_code, l.language_name, l.native_name
+             FROM learning_tracks t
+             LEFT JOIN learning_languages l ON l.language_code = t.language_code
+             WHERE t.id = ?
+             LIMIT 1'
+        );
+        $languageStatement->execute([$trackId]);
+        $languageRow = $languageStatement->fetch();
+
+        if ($languageRow) {
+            $languageCode = (string)($languageRow['language_code'] ?? 'fa');
+            $languageName = (string)(
+                $languageRow['native_name']
+                ?: ($languageRow['language_name'] ?: $languageCode)
+            );
+        }
+    }
+
+    $outputLanguage = match (strtolower($languageCode)) {
+        'en' => 'English',
+        'fr' => 'French',
+        'de' => 'German',
+        'es' => 'Spanish',
+        'it' => 'Italian',
+        'pt' => 'Portuguese',
+        'ru' => 'Russian',
+        'tr' => 'Turkish',
+        'ar' => 'Arabic',
+        'fa' => 'Persian',
+        'ja' => 'Japanese',
+        'zh' => 'Chinese',
+        default => $languageName
+    };
     $targetStudentId = !empty($body['target_student_id']) ? (int)$body['target_student_id'] : null;
     if ($model === '') { $routeStmt=app_db()->prepare('SELECT model_id FROM ai_operation_model_routes WHERE operation_key=? LIMIT 1'); $routeStmt->execute(['question_generation']); $model=trim((string)$routeStmt->fetchColumn()); }
     if ($model === '') $model = (string)(app_db()->query('SELECT default_model FROM ai_provider_settings WHERE id=1')->fetchColumn() ?: '');
