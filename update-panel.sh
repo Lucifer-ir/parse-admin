@@ -33,6 +33,24 @@ echo "[2/8] Fetching latest production source..."
 git -C "$REPO_DIR" fetch --prune origin main
 git -C "$REPO_DIR" reset --hard origin/main
 
+# Disable stale server-side page overrides after preserving them.
+# The entry point prefers *.local.php files over tracked canonical pages.
+# These overrides can keep old code alive after a Git update.
+LOCAL_OVERRIDE_DIR="$WEB_ROOT/pages"
+OVERRIDE_BACKUP_ROOT="/var/backups/parse-admin/local-overrides"
+if [[ -d "$LOCAL_OVERRIDE_DIR" ]]; then
+  mapfile -t LOCAL_OVERRIDES < <(find "$LOCAL_OVERRIDE_DIR" -maxdepth 1 -type f -name '*.local.php' -print)
+  if (( ${#LOCAL_OVERRIDES[@]} > 0 )); then
+    BACKUP_DIR="$OVERRIDE_BACKUP_ROOT/$(date +%Y%m%d-%H%M%S)"
+    install -d -o root -g root -m 0700 "$BACKUP_DIR"
+    for override in "${LOCAL_OVERRIDES[@]}"; do
+      cp -a "$override" "$BACKUP_DIR/"
+      mv "$override" "${override}.disabled-by-update"
+      echo "[WARN] Disabled stale page override: $override (backup: $BACKUP_DIR)"
+    done
+  fi
+fi
+
 for required in \
   app/bootstrap.php app/public/index.php app/public/api.php app/public/pages/dashboard.php app/public/pages/users.php app/public/assets/admin.css app/public/assets/admin.js \
   backend/config.php backend/schema.sql backend/public/index.php backend/platform_routes.php \
