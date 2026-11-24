@@ -65,7 +65,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y shellcheck
-          shellcheck -S warning install.sh update-panel.sh backend/bin/backup-db.sh
+          shellcheck -S error install.sh update-panel.sh backend/bin/backup-db.sh
 
   sql:
     name: SQL static checks
@@ -75,7 +75,9 @@ jobs:
       - name: Check schema and migration files
         run: |
           test -s backend/schema.sql
-          find backend/migrations -type f -name '*.sql' -print0 | xargs -0 -n1 test -s
+          mapfile -t migrations < <(find backend/migrations -type f -name '*.sql')
+          test "${migrations[@]}" != ""
+          for migration in "${migrations[@]}"; do test -s "$migration"; done
       - name: Flag destructive migration statements
         run: |
           if grep -RInE '(^|[[:space:]])(DROP[[:space:]]+(DATABASE|TABLE)|TRUNCATE[[:space:]]+TABLE)([[:space:]]|;)' backend/migrations; then
@@ -96,3 +98,5 @@ jobs:
           test -d app/public/pages
           test -d backend/migrations
           test -d backend/bin
+      - name: Run smoke tests
+        run: bash tests/smoke.sh
