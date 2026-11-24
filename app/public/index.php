@@ -97,7 +97,7 @@ $assetVersion = max(
 <html lang="fa" dir="rtl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1">\n<script src="https://cdn.tailwindcss.com"></script>
 <meta name="theme-color" content="#0a1222">
 <meta name="csrf-token" content="<?= app_e($csrf) ?>">
 <meta name="admin-role" content="<?= $isDeveloperAdmin ? 'developer_admin' : 'education_admin' ?>">
