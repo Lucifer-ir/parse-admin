@@ -1,1 +1,2 @@
--- Idempotently extend account roles without changing existing accounts or credentials.\nALTER TABLE users MODIFY COLUMN role ENUM('user','admin','developer_admin','education_admin','teacher') NOT NULL DEFAULT 'user';\n
+-- Idempotently extend account roles without changing existing accounts or credentials.
+ALTER TABLE users MODIFY COLUMN role ENUM('user','admin','developer_admin','education_admin','teacher') NOT NULL DEFAULT 'user';
