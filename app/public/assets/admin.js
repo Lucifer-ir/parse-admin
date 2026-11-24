@@ -4,6 +4,18 @@
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
   const csrf = $('meta[name="csrf-token"]')?.content || '';
+  // Independent splash timeout; deliberately does not depend on init or API.
+  const splashAtBoot = document.getElementById('parseStartup');
+  if (splashAtBoot) {
+    setTimeout(() => {
+      splashAtBoot.classList.add('done');
+      splashAtBoot.style.opacity = '0';
+      splashAtBoot.style.visibility = 'hidden';
+      splashAtBoot.style.pointerEvents = 'none';
+      splashAtBoot.remove();
+    }, 5000);
+  }
+
   const isDeveloperAdmin = ['developer_admin','admin'].includes($('meta[name="admin-role"]')?.content || '');
   const state = { catalogs: {}, lastQuestionOutput: '', bootstrap: null, currentPage: 'dashboard', users: [], questions: [], prompts: [], students: [], resources: [], exams: [], attempts: [], tracks: [], activities: [], activitySubmissions: [], platformSettings: {} };
   const number = value => Number(value || 0).toLocaleString('fa-IR');
