@@ -891,3 +891,23 @@ body.app-page{background:#edf3ec!important;color:#263d32!important}
 .shield{font-size:14px!important;color:#d4a94e!important;}
 .login-card h1{font-size:24px!important;line-height:1.75!important;margin:0 0 10px!important;}
 .login-description{max-width:390px!important;line-height:1.9!important;margin-bottom:25px!important;}
+
+/* Match the Parseh loader palette on login; eliminate pseudo-glyph icon artifacts */
+.login-page{background:#e2eeeb!important;color:#174e4a!important;}
+.login-page:before{background:radial-gradient(circle at 50% 35%,#edf5f2 0%,#e2eeeb 62%,#d6e7e3 100%)!important;filter:none!important;}
+.login-page:after{background:transparent!important;}
+.login-brand .login-logo{width:min(260px,76%)!important;max-height:96px!important;}
+.login-card h1,.login-card h1 span{color:#174e4a!important;}
+.login-description{color:#567975!important;}
+.login-form{background:rgba(248,251,250,.92)!important;border-color:#c7dcd7!important;box-shadow:0 16px 42px rgba(27,79,72,.09)!important;}
+.login-form label{color:#345f59!important;}
+.field-wrap{background:#fff!important;border:1px solid #cbded9!important;border-radius:12px!important;padding:0 14px!important;overflow:hidden!important;}
+.field-wrap:focus-within{border-color:#0e6b68!important;box-shadow:0 0 0 3px rgba(14,107,104,.11)!important;}
+.field-icon:before{content:none!important;display:none!important;}
+.field-icon{font-family:inherit!important;font-size:16px!important;color:#0e6b68!important;}
+.field-wrap input{background:transparent!important;color:#173d3a!important;}
+.login-submit{background:#0e6b68!important;border-radius:11px!important;box-shadow:0 6px 16px rgba(14,107,104,.15)!important;}
+.login-submit:hover{background:#0a5b57!important;}
+.login-foot{color:#688783!important;}
+.shield{color:#0e6b68!important;}
+.login-page .login-side{display:none!important;}
