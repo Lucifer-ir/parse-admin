@@ -962,5 +962,4 @@ body.light-theme .input, body.light-theme input, body.light-theme select, body.l
  background:#fff!important;color:#172b36!important;border-color:#cbd5e1!important;
 }
 body.light-theme .sidebar { border-color:#e2e8f0!important; }
-[data-page="users"], #page-users, [data-page="prompts"], #page-prompts,
-[data-page="usage"], #page-usage, [data-page="history"], #page-history { display:initial; }
+[data-page="users"], [data-page="prompts"], [data-page="usage"], [data-page="history"] { display:flex!important; }
