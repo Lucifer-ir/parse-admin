@@ -118,8 +118,8 @@ $assetVersion = max(
     <?php if ($loginError !== ''): ?><div class="login-alert" role="alert"><?= app_e($loginError) ?></div><?php endif; ?>
     <form method="post" action="/" class="login-form" autocomplete="on">
       <input type="hidden" name="action" value="login"><input type="hidden" name="_csrf" value="<?= app_e($csrf) ?>">
-      <label for="email">ایمیل مدیر</label><div class="field-wrap"><i class="field-icon fa fa-envelope" aria-hidden="true"></i><input id="email" name="email" type="email" autocomplete="username" placeholder="admin@yourdomain.com" required autofocus value="<?= app_e($_POST['email'] ?? '') ?>"></div>
-      <label for="password">رمز عبور</label><div class="field-wrap"><i class="field-icon fa fa-lock" aria-hidden="true"></i><input id="password" name="password" type="password" autocomplete="current-password" placeholder="رمز عبور حساب مدیر" required></div>
+      <label for="email">ایمیل مدیر</label><div class="field-wrap"><i class="fa fa-envelope" aria-hidden="true"></i><input id="email" name="email" type="email" autocomplete="username" placeholder="admin@yourdomain.com" required autofocus value="<?= app_e($_POST['email'] ?? '') ?>"></div>
+      <label for="password">رمز عبور</label><div class="field-wrap"><i class="fa fa-lock" aria-hidden="true"></i><input id="password" name="password" type="password" autocomplete="current-password" placeholder="رمز عبور حساب مدیر" required></div>
       <button class="login-submit" type="submit"><span>ورود امن به پنل</span><i class="fa fa-arrow-left" aria-hidden="true"></i></button>
     </form>
     <div class="login-foot">ارتباط امن با نشست سمت سرور · محافظت‌شده با HTTPS</div>
