@@ -753,3 +753,18 @@ body.app-page{background:#edf3ec!important;color:#263d32!important}
 @keyframes parseDots{0%,80%,100%{opacity:.35;transform:translateY(0)}40%{opacity:1;transform:translateY(-5px)}}
 /* Low-density educational icon texture, not dot texture */
 #parseStartup:after{content:'';position:absolute;inset:0;pointer-events:none;opacity:.085;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'%3E%3Cg fill='%230E6B68' fill-opacity='1'%3E%3Cpath d='M34 28h26v5H34zM42 21h10v19H42z'/%3E%3Cpath d='M115 23l13 5 5 13-13 5-13-5 5-13z'/%3E%3Cpath d='M24 115h25v18H24zM29 110h15v5H29z'/%3E%3Cpath d='M119 112h22v22h-22zM124 107h12v5h-12z'/%3E%3Cpath d='M82 75l17 8v18l-17 8-17-8V83z'/%3E%3C/g%3E%3C/svg%3E")!important;background-size:180px 180px!important}
+
+/* Final Parseh startup: logo, teal three-dot loader, Telegram-style education icon wallpaper */
+:root{--parse-brand:#0E6B68}
+#parseStartup{position:fixed!important;inset:0!important;z-index:99999!important;display:flex!important;flex-direction:column!important;justify-content:center!important;align-items:center!important;gap:26px!important;background:#e7f1ef!important;background-image:linear-gradient(135deg,#e7f1ef,#dcebea)!important;transition:opacity .3s,visibility .3s!important;overflow:hidden!important}
+#parseStartup:before{content:''!important;position:absolute!important;inset:0!important;opacity:.12!important;pointer-events:none!important;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240' viewBox='0 0 240 240'%3E%3Cg fill='none' stroke='%230E6B68' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M30 35h30v23H30zM35 28h20v7M39 42h12'/%3E%3Cpath d='M135 30l22 9v27l-22 9-22-9V39zM125 45h20M125 53h20'/%3E%3Cpath d='M42 137l28-15 28 15-28 15zM42 137v26l28 15 28-15v-26M70 152v26'/%3E%3Cpath d='M154 130h34a10 10 0 0 1 10 10v24a10 10 0 0 1-10 10h-18l-13 12v-12a10 10 0 0 1-10-10v-24a10 10 0 0 1 10-10z'/%3E%3Cpath d='M30 205l25-7 7 25-25 7zM42 211l13 8'/%3E%3Cpath d='M195 30h25v25h-25zM200 35h15M200 42h15M200 49h10'/%3E%3C/g%3E%3C/svg%3E")!important;background-size:240px 240px!important}
+#parseStartup:after{content:none!important}
+#parseStartup .mark{position:relative!important;z-index:1!important;width:auto!important;height:auto!important;max-width:240px!important;max-height:160px!important;background:transparent!important;border:none!important;box-shadow:none!important;border-radius:0!important;padding:0!important;font-size:0!important;display:block!important}
+#parseStartup .mark:after{content:none!important}
+#parseStartup .mark img{display:block!important;width:clamp(140px,22vw,210px)!important;height:auto!important;max-width:75vw!important;object-fit:contain!important}
+#parseStartup .spin{display:none!important}
+#parseStartup p{display:none!important}
+#parseStartup .dots{position:relative!important;z-index:1!important;display:flex!important;gap:9px!important;align-items:center!important;justify-content:center!important;height:20px!important}
+#parseStartup .dots span{display:block!important;width:8px!important;height:8px!important;border-radius:50%!important;background:#0E6B68!important;animation:parsehDot 1.2s ease-in-out infinite!important}
+#parseStartup .dots span:nth-child(2){animation-delay:.15s!important}#parseStartup .dots span:nth-child(3){animation-delay:.3s!important}
+@keyframes parsehDot{0%,80%,100%{opacity:.35;transform:translateY(0)}40%{opacity:1;transform:translateY(-6px)}}
