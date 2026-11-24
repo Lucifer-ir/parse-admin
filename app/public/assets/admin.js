@@ -90,15 +90,8 @@
   }
 
   function bindMobileDock() {
-    const dock = $('#mobileQuickDock');
-    if (dock && !dock.dataset.bound) {
-      dock.dataset.bound = '1';
-      dock.addEventListener('click', event => {
-        const pageButton = event.target.closest('[data-quick-page]');
-        if (pageButton) showPage(pageButton.dataset.quickPage);
-      });
-    }
-    $$('#themeToggle,[data-theme-toggle]').forEach(button => {
+    // Mobile bottom navigation dock removed; retain theme toggle and drawer menu.
+    $('#themeToggle,[data-theme-toggle]').forEach(button => {
       if (button.dataset.bound) return;
       button.dataset.bound = '1';
       button.addEventListener('click', event => {
