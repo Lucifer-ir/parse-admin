@@ -1528,8 +1528,56 @@ if ($method === 'DELETE' && preg_match('#^/questions/([1-9][0-9]*)$#',$path,$mat
     app_json(200,['deleted'=>$deleted]);
 }
 
-if ($method === 'GET' && $path === '/model-routing') { $rows=app_db()->query('SELECT operation_key,model_id FROM ai_operation_model_routes ORDER BY operation_key')->fetchAll(); app_json(200,['rows'=>$rows]); }
-if ($method === 'POST' && $path === '/model-routing') { $body=app_request_json(); $routes=$body['routes']??[]; if(!is_array($routes))app_json(422,['error'=>'تنظیم مسیر مدل معتبر نیست.']); $pdo=app_db(); $pdo->beginTransaction(); try{foreach($routes as $key=>$model){if(!preg_match('/^[a-z0-9_-]{2,60}$/',(string)$key))continue;$model=trim((string)$model);$stmt=$pdo->prepare('INSERT INTO ai_operation_model_routes(operation_key,model_id) VALUES(?,?) ON DUPLICATE KEY UPDATE model_id=VALUES(model_id)');$stmt->execute([(string)$key,$model]);}$pdo->commit();}catch(Throwable $e){$pdo->rollBack();app_json(500,['error'=>'ذخیره تنظیم مدل‌ها انجام نشد.']);}app_json(200,['ok'=>true,'message'=>'مدل‌های اختصاصی عملیات ذخیره شدند.']);}\nif ($method === 'GET' && $path === '/settings') {
+if ($method === 'GET' && $path === '/model-routing') {
+    $rows = app_db()
+        ->query('SELECT operation_key, model_id FROM ai_operation_model_routes ORDER BY operation_key')
+        ->fetchAll();
+
+    app_json(200, ['rows' => $rows]);
+}
+
+if ($method === 'POST' && $path === '/model-routing') {
+    $body = app_request_json();
+    $routes = $body['routes'] ?? [];
+
+    if (!is_array($routes)) {
+        app_json(422, ['error' => 'تنظیم مسیر مدل معتبر نیست.']);
+    }
+
+    $pdo = app_db();
+    $pdo->beginTransaction();
+
+    try {
+        foreach ($routes as $key => $model) {
+            if (!preg_match('/^[a-z0-9_-]{2,60}$/', (string) $key)) {
+                continue;
+            }
+
+            $model = trim((string) $model);
+            $stmt = $pdo->prepare(
+                'INSERT INTO ai_operation_model_routes (operation_key, model_id)
+                 VALUES (?, ?)
+                 ON DUPLICATE KEY UPDATE model_id = VALUES(model_id)'
+            );
+            $stmt->execute([(string) $key, $model]);
+        }
+
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+
+        app_json(500, ['error' => 'ذخیره تنظیم مدل‌ها انجام نشد.']);
+    }
+
+    app_json(200, [
+        'ok' => true,
+        'message' => 'مدل‌های اختصاصی عملیات ذخیره شدند.',
+    ]);
+}
+
+if ($method === 'GET' && $path === '/settings') {
     $row = app_db()->query('SELECT default_model,api_key_ciphertext,updated_at FROM ai_provider_settings WHERE id=1')->fetch() ?: [];
     app_json(200, [
         'configured' => !empty($row['api_key_ciphertext']),
