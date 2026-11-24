@@ -949,37 +949,197 @@ if ($method === 'GET' && $path === '/platform/exams') {
 }
 
 if ($method === 'POST' && $path === '/platform/exams') {
-    $body=app_request_json();
-    $title=trim((string)($body['title']??''));
-    $questionIds=array_values(array_unique(array_filter(array_map('intval',(array)($body['question_ids']??[])),static fn($id)=>$id>0)));
-    $selectionMode=(string)($body['question_selection']??'manual');
-    $trackId=!empty($body['track_id'])?(int)$body['track_id']:null;
-    $resolvedLevel=platform_track_level(app_db(),$trackId);
-    if($selectionMode==='automatic'){
-      $count=min(100,max(1,(int)($body['question_count']??10)));
-      $level=trim((string)($body['question_level']??''))?:($resolvedLevel?:null);
-      $sub=trim((string)($body['subject']??''))?:null;
-      $pdoSelect=app_db();
-      $sql="SELECT q.id FROM question_bank q WHERE q.status='published' AND (? IS NULL OR q.track_id=? OR q.track_id IS NULL) AND (? IS NULL OR q.level=?) AND (? IS NULL OR q.subject=?) AND q.id NOT IN (SELECT eq.question_id FROM exam_questions eq JOIN exams e ON e.id=eq.exam_id WHERE e.status<>'closed' AND (? IS NULL OR e.track_id=?) ) ORDER BY RAND() LIMIT ".$count;
-      $st=$pdoSelect->prepare($sql);$st->execute([$trackId,$trackId,$level,$level,$sub,$sub,$trackId,$trackId]);
-      $questionIds=array_map('intval',$st->fetchAll(PDO::FETCH_COLUMN));
+    $body = app_request_json();
+    $title = trim((string) ($body['title'] ?? ''));
+
+    $questionIds = array_values(array_unique(
+        array_filter(
+            array_map('intval', (array) ($body['question_ids'] ?? [])),
+            static fn ($id) => $id > 0
+        )
+    ));
+
+    $selectionMode = (string) ($body['question_selection'] ?? 'manual');
+    $trackId = !empty($body['track_id']) ? (int) $body['track_id'] : null;
+    $resolvedLevel = platform_track_level(app_db(), $trackId);
+
+    if ($selectionMode === 'automatic') {
+        $questionCount = min(
+            100,
+            max(1, (int) ($body['question_count'] ?? 10))
+        );
+
+        $questionLevel = trim((string) ($body['question_level'] ?? ''));
+        $questionLevel = $questionLevel ?: ($resolvedLevel ?: null);
+
+        $subject = trim((string) ($body['subject'] ?? ''));
+        $subject = $subject ?: null;
+
+        $pdoSelect = app_db();
+
+        $sql = "
+            SELECT q.id
+            FROM question_bank AS q
+            WHERE q.status = 'published'
+                AND (? IS NULL OR q.track_id = ? OR q.track_id IS NULL)
+                AND (? IS NULL OR q.level = ?)
+                AND (? IS NULL OR q.subject = ?)
+                AND q.id NOT IN (
+                    SELECT eq.question_id
+                    FROM exam_questions AS eq
+                    INNER JOIN exams AS e ON e.id = eq.exam_id
+                    WHERE e.status <> 'closed'
+                        AND (? IS NULL OR e.track_id = ?)
+                )
+            ORDER BY RAND()
+            LIMIT " . $questionCount;
+
+        $statement = $pdoSelect->prepare($sql);
+        $statement->execute([
+            $trackId,
+            $trackId,
+            $questionLevel,
+            $questionLevel,
+            $subject,
+            $subject,
+            $trackId,
+            $trackId,
+        ]);
+
+        $questionIds = array_map(
+            'intval',
+            $statement->fetchAll(PDO::FETCH_COLUMN)
+        );
     }
-    $duration=min(600,max(1,(int)($body['duration_minutes']??30)));
-    if($title===''||count($questionIds)<1||count($questionIds)>200)app_json(422,['error'=>$selectionMode==='automatic'?'با فیلترهای انتخاب‌شده سؤال کافی در بانک وجود ندارد.':'عنوان آزمون و حداقل یک سؤال از بانک سؤال الزامی است.']);
-    $start=trim((string)($body['starts_at']??''))?:null;$end=trim((string)($body['ends_at']??''))?:null;
-    if($start!==null&&$end!==null&&strtotime($end)<=strtotime($start))app_json(422,['error'=>'زمان پایان باید بعد از زمان شروع باشد.']);
-    $status=in_array(($body['status']??'draft'),['draft','published','closed'],true)?$body['status']:'draft';
-    $pdo=app_db();$pdo->beginTransaction();
-    try{
-      $pdo->prepare('INSERT INTO exams(title,description,subject,level,track_id,duration_minutes,starts_at,ends_at,target_student_id,shuffle_questions,shuffle_options,show_result,passing_score,status,created_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-        ->execute([$title,trim((string)($body['description']??''))?:null,trim((string)($body['subject']??''))?:null,$resolvedLevel,$trackId,$duration,$start,$end,!empty($body['target_student_id'])?(int)$body['target_student_id']:null,!empty($body['shuffle_questions'])?1:0,!empty($body['shuffle_options'])?1:0,!empty($body['show_result'])?1:0,max(0,min(100,(float)($body['passing_score']??50))),$status,(int)$admin['id']]);
-      $examId=(int)$pdo->lastInsertId();
-      $validStmt=$pdo->prepare("SELECT id FROM question_bank WHERE id=? AND status='published'");
-      $link=$pdo->prepare('INSERT INTO exam_questions(exam_id,question_id,position,points) VALUES(?,?,?,?)');
-      foreach($questionIds as $position=>$qid){$validStmt->execute([$qid]);if(!$validStmt->fetchColumn())throw new InvalidArgumentException('یکی از سؤال‌های انتخاب‌شده در بانک سؤال وجود ندارد.');$link->execute([$examId,$qid,$position+1,max(0.25,(float)($body['points'][$qid]??1))]);}
-      $pdo->commit();
-    }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();if($e instanceof InvalidArgumentException)app_json(422,['error'=>$e->getMessage()]);throw $e;}
-    app_json(201,['ok'=>true,'id'=>$examId]);
+
+    $duration = min(
+        600,
+        max(1, (int) ($body['duration_minutes'] ?? 30))
+    );
+
+    if (
+        $title === ''
+        || count($questionIds) < 1
+        || count($questionIds) > 200
+    ) {
+        $errorMessage = $selectionMode === 'automatic'
+            ? 'با فیلترهای انتخاب‌شده سؤال کافی در بانک سؤال وجود ندارد.'
+            : 'عنوان آزمون و حداقل یک سؤال از بانک سؤال الزامی است.';
+
+        app_json(422, ['error' => $errorMessage]);
+    }
+
+    $start = trim((string) ($body['starts_at'] ?? '')) ?: null;
+    $end = trim((string) ($body['ends_at'] ?? '')) ?: null;
+
+    if ($start !== null && $end !== null && strtotime($end) <= strtotime($start)) {
+        app_json(422, ['error' => 'زمان پایان باید بعد از زمان شروع باشد.']);
+    }
+
+    $requestedStatus = $body['status'] ?? 'draft';
+    $status = in_array(
+        $requestedStatus,
+        ['draft', 'published', 'closed'],
+        true
+    ) ? $requestedStatus : 'draft';
+
+    $pdo = app_db();
+    $pdo->beginTransaction();
+
+    try {
+        $insertExam = $pdo->prepare(
+            'INSERT INTO exams (
+                title,
+                description,
+                subject,
+                level,
+                track_id,
+                duration_minutes,
+                starts_at,
+                ends_at,
+                target_student_id,
+                shuffle_questions,
+                shuffle_options,
+                show_result,
+                passing_score,
+                status,
+                created_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        );
+
+        $insertExam->execute([
+            $title,
+            trim((string) ($body['description'] ?? '')) ?: null,
+            trim((string) ($body['subject'] ?? '')) ?: null,
+            $resolvedLevel,
+            $trackId,
+            $duration,
+            $start,
+            $end,
+            !empty($body['target_student_id'])
+                ? (int) $body['target_student_id']
+                : null,
+            !empty($body['shuffle_questions']) ? 1 : 0,
+            !empty($body['shuffle_options']) ? 1 : 0,
+            !empty($body['show_result']) ? 1 : 0,
+            max(0, min(100, (float) ($body['passing_score'] ?? 50))),
+            $status,
+            (int) $admin['id'],
+        ]);
+
+        $examId = (int) $pdo->lastInsertId();
+
+        $validateQuestion = $pdo->prepare(
+            "SELECT id
+            FROM question_bank
+            WHERE id = ?
+                AND status = 'published'"
+        );
+
+        $linkQuestion = $pdo->prepare(
+            'INSERT INTO exam_questions (exam_id, question_id, position, points)
+            VALUES (?, ?, ?, ?)'
+        );
+
+        foreach ($questionIds as $position => $questionId) {
+            $validateQuestion->execute([$questionId]);
+
+            if (!$validateQuestion->fetchColumn()) {
+                throw new InvalidArgumentException(
+                    'یکی از سؤال‌های انتخاب‌شده در بانک سؤال وجود ندارد.'
+                );
+            }
+
+            $points = max(
+                0.25,
+                (float) ($body['points'][$questionId] ?? 1)
+            );
+
+            $linkQuestion->execute([
+                $examId,
+                $questionId,
+                $position + 1,
+                $points,
+            ]);
+        }
+
+        $pdo->commit();
+    } catch (Throwable $exception) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+
+        if ($exception instanceof InvalidArgumentException) {
+            app_json(422, ['error' => $exception->getMessage()]);
+        }
+
+        throw $exception;
+    }
+
+    app_json(201, [
+        'ok' => true,
+        'id' => $examId,
+    ]);
 }
 
 if ($method === 'POST' && preg_match('#^/platform/exams/([1-9][0-9]*)/status$#',$path,$m)) {
