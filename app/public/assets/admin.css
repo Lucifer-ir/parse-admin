@@ -33,7 +33,6 @@ a{color:inherit;text-decoration:none}
 .login-submit b{font-size:21px}
 .login-alert{background:#54253366;border:1px solid #a94c61;color:#ffabb9;border-radius:11px;padding:12px 14px;font-size:12px;line-height:1.8;margin-bottom:16px}
 .login-foot{color:#758aa4;font-size:10px;margin-top:24px;display:flex;align-items:center;gap:9px}
-.shield{color:#55d5b4}
 .login-side{position:relative;overflow:hidden;background:linear-gradient(145deg,#0e2942,#132644 53%,#182447);padding:60px;display:flex;flex-direction:column;justify-content:center}
 .login-side:before{content:"";position:absolute;inset:0;background-image:linear-gradient(#9cb9e90b 1px,transparent 1px),linear-gradient(90deg,#9cb9e90b 1px,transparent 1px);background-size:38px 38px;mask-image:linear-gradient(135deg,#000,transparent 85%)}
 .login-side:after{content:"";position:absolute;width:520px;height:520px;border:1px solid #64b5ce1c;border-radius:50%;top:50%;left:50%;transform:translate(-25%,-50%);box-shadow:0 0 0 45px #64b5ce09,0 0 0 100px #64b5ce06,0 0 0 165px #64b5ce04}
@@ -822,7 +821,6 @@ body.app-page{background:#edf3ec!important;color:#263d32!important}
 .field-wrap input::placeholder{color:#93a6a2!important;}
 .login-submit{background:#0e6b68!important;color:white!important;box-shadow:0 8px 20px #0e6b681c!important;border-radius:11px!important;}
 .login-foot{color:#78918c!important;}
-.shield{color:#0e6b68!important;}
 .login-side{background:#e9f0ee!important;padding:clamp(28px,4vw,50px)!important;}
 .login-side:before{background-image:none!important;}
 .login-side:after{border-color:#0e6b6810!important;box-shadow:0 0 0 45px #0e6b6807,0 0 0 100px #0e6b6805,0 0 0 165px #0e6b6803!important;}
@@ -867,7 +865,6 @@ body.app-page{background:#edf3ec!important;color:#263d32!important}
 .login-submit b{font-size:0!important;}
 .login-submit b:before{content:'\\f090';font-family:'Font Awesome 6 Free';font-weight:900;font-size:15px;}
 .login-foot{justify-content:center!important;color:#a9a195!important;font-size:10px!important;margin-top:18px!important;text-align:center!important;}
-.shield{font-size:0!important;}
 .shield:before{content:'\\f3ed';font-family:'Font Awesome 6 Free';font-weight:900;font-size:12px;color:#e4b044;}
 .login-side,.login-decoration{display:none!important;}
 @media(max-width:560px){.login-page{padding:16px!important}.login-form{padding:24px 18px!important}}
@@ -888,7 +885,6 @@ body.app-page{background:#edf3ec!important;color:#263d32!important}
 .login-submit i{font-size:15px!important;}
 .login-submit b{display:none!important;}
 .login-foot{display:flex!important;align-items:center!important;justify-content:center!important;gap:8px!important;margin-top:18px!important;font-size:11px!important;color:#a9a195!important;text-align:center!important;}
-.shield{font-size:14px!important;color:#d4a94e!important;}
 .login-card h1{font-size:24px!important;line-height:1.75!important;margin:0 0 10px!important;}
 .login-description{max-width:390px!important;line-height:1.9!important;margin-bottom:25px!important;}
 
@@ -909,10 +905,8 @@ body.app-page{background:#edf3ec!important;color:#263d32!important}
 .login-submit{background:#0e6b68!important;border-radius:11px!important;box-shadow:0 6px 16px rgba(14,107,104,.15)!important;}
 .login-submit:hover{background:#0a5b57!important;}
 .login-foot{color:#688783!important;}
-.shield{color:#0e6b68!important;}
 .login-page .login-side{display:none!important;}
 
 /* Font Awesome 4.7 uses .fa, not .fa-solid; keep real glyphs visible */
 .field-icon{font-family:FontAwesome!important;font-size:16px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;color:#0e6b68!important;}
 .login-submit>.fa{font-family:FontAwesome!important;font-size:15px!important;display:inline-block!important;}
-.login-foot>.shield{font-family:FontAwesome!important;font-size:14px!important;display:inline-block!important;color:#0e6b68!important;}
