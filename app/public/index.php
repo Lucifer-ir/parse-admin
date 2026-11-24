@@ -37,7 +37,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && ($_POST['action'] ?? '')
                 $stmt->execute([$email]);
                 $user = $stmt->fetch();
                 $valid = $user && password_verify($password,(string)$user['password_hash'])
-                    && in_array((string)$user['role'], ['admin','developer_admin','education_admin'], true) && (bool)$user['active'];
+                    && in_array((string)$user['role'], ['admin','developer_admin','education_admin','teacher'], true) && (bool)$user['active'];
 
                 $attempt = $pdo->prepare('INSERT INTO login_attempts (ip_address,email,success) VALUES (?,?,?)');
                 $attempt->execute([$ip,$email,$valid?1:0]);
@@ -87,7 +87,7 @@ header('Pragma: no-cache');
 header('X-Content-Type-Options: nosniff');
 header('Referrer-Policy: strict-origin-when-cross-origin');
 header('X-Frame-Options: DENY');
-header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' https://cdnjs.cloudflare.com; style-src-attr 'unsafe-inline'; font-src 'self' https://cdnjs.cloudflare.com data:; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");
+header("Content-Security-Policy: default-src 'self'; script-src 'self' https://cdn.tailwindcss.com; style-src 'self' https://cdnjs.cloudflare.com 'unsafe-inline'; style-src-attr 'unsafe-inline'; font-src 'self' https://cdnjs.cloudflare.com data:; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");
 $csrf=app_csrf();
 $assetVersion = max(
     (int)(@filemtime(__DIR__ . '/assets/admin.css') ?: 0),
@@ -97,7 +97,7 @@ $assetVersion = max(
 <html lang="fa" dir="rtl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">\n<script src="https://cdn.tailwindcss.com"></script>
+<meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.tailwindcss.com"></script>
 <meta name="theme-color" content="#0a1222">
 <meta name="csrf-token" content="<?= app_e($csrf) ?>">
 <meta name="admin-role" content="<?= $isDeveloperAdmin ? 'developer_admin' : 'education_admin' ?>">
@@ -209,7 +209,7 @@ $assetVersion = max(
     <?php if (!empty($pageAccess['prompts'])) { $pageLocal = __DIR__ . '/pages/prompts.local.php'; $pageDefault = __DIR__ . '/pages/prompts.php'; require is_file($pageLocal) ? $pageLocal : $pageDefault; } ?>
 
     <?php if (!empty($pageAccess['settings'])) { $pageLocal = __DIR__ . '/pages/settings.local.php'; $pageDefault = __DIR__ . '/pages/settings.php'; require is_file($pageLocal) ? $pageLocal : $pageDefault; } ?>
-    <footer class="app-footer"><span>PARSE ADMIN</span><span>Secure server-side console · <?= date('Y') ?></span></footer>
+    <nav id="mobileQuickDock" class="mobile-quick-dock" aria-label="دسترسی سریع"><button type="button" data-quick-page="dashboard"><i class="fa fa-home"></i><span>خانه</span></button><button type="button" data-quick-page="question-bank"><i class="fa fa-book"></i><span>بانک سؤال</span></button><button type="button" data-quick-page="students"><i class="fa fa-users"></i><span>دانش‌آموز</span></button><button type="button" id="themeToggle"><i class="fa fa-moon-o"></i><span>تم</span></button><button type="button" id="quickMenu"><i class="fa fa-bars"></i><span>منو</span></button></nav><footer class="app-footer"><span>PARSE ADMIN</span><span>Secure server-side console · <?= date('Y') ?></span></footer>
   </main>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
