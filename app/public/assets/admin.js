@@ -65,7 +65,7 @@
 
   function json(data) { return JSON.stringify(data); }
 
-  function showPage(page, label) {
+  function showPage(page, label, updateUrl = true) { if(updateUrl){const url=new URL(location.href);url.searchParams.set('page',page);history.pushState({page},'',url);}
     const titles = {
       dashboard:'داشبورد', models:'کاتالوگ مدل‌ها', questions:'تولید سؤال', practice:'طراحی تمرین',
       review:'بررسی و ویرایش متن', playground:'AI Playground', multimodal:'تصویر و صوت',
@@ -1418,6 +1418,12 @@
   }
 
   async function init() {
+    const iconMap={dashboard:'fa-gauge-high',models:'fa-cubes',questions:'fa-wand-magic-sparkles',practice:'fa-list-check',review:'fa-file-pen',playground:'fa-terminal',multimodal:'fa-photo-film',structured:'fa-code',batches:'fa-layer-group',usage:'fa-chart-line',history:'fa-clock-rotate-left','question-bank':'fa-database',users:'fa-users',students:'fa-user-graduate',resources:'fa-book',exams:'fa-file-circle-check',attempts:'fa-clipboard-check',monitoring:'fa-chart-area',tracks:'fa-route',activities:'fa-list','activity-submissions':'fa-inbox',prompts:'fa-message',settings:'fa-gear'};
+    $('.nav-item').forEach(n=>{const ic=$('i',n);if(ic){ic.className='fa-solid '+(iconMap[n.dataset.page]||'fa-circle');ic.textContent='';}});
+    const splash=$('#parseStartup');if(splash)setTimeout(()=>splash.classList.add('done'),550);
+    const initial=new URL(location.href).searchParams.get('page');if(initial&&$('#page-'+initial))showPage(initial,undefined,false);
+    window.addEventListener('popstate',()=>{const p=new URL(location.href).searchParams.get('page')||'dashboard';if($('#page-'+p))showPage(p,undefined,false);});
+
     bindPlatformForms();
     bindPlatformTables();
     initPlatformNavigation();
