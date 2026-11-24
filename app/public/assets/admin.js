@@ -116,7 +116,7 @@
     if (page === 'monitoring') loadMonitoring();
     if (page === 'tracks') loadTracks();
     if (page === 'activities') { loadActivities(); loadTracks(); loadStudents(); loadPlatformQuestionBank(); }
-    if (page === 'activity-submissions') loadActivitySubmissions();
+    if (page === 'activity-submissions') loadActivitySubmissions();\n    if (page === 'debug') loadDebugLogs();
     if (page === 'question-bank') { loadPlatformQuestionBank(); loadResources(); loadStudents(); loadTracks(); }
     if (isDeveloperAdmin && (page === 'questions' || page === 'practice' || page === 'review' || page === 'playground')) {
       if (!state.catalogs.models) loadCatalog('models');
@@ -1499,7 +1499,7 @@
   }
 
   async function init() {
-    const iconMap={dashboard:'fa-dashboard',models:'fa-cubes',questions:'fa-magic',practice:'fa-list',review:'fa-edit',playground:'fa-terminal',multimodal:'fa-picture-o',structured:'fa-code',batches:'fa-tasks',usage:'fa-line-chart',history:'fa-history','question-bank':'fa-database',users:'fa-users',students:'fa-graduation-cap',resources:'fa-book',exams:'fa-file-text',attempts:'fa-check-square-o',monitoring:'fa-area-chart',tracks:'fa-road',activities:'fa-list', 'activity-submissions':'fa-inbox',prompts:'fa-comment',settings:'fa-cog'};
+    const iconMap={dashboard:'fa-dashboard',models:'fa-cubes',questions:'fa-magic',practice:'fa-list',review:'fa-edit',playground:'fa-terminal',multimodal:'fa-picture-o',structured:'fa-code',batches:'fa-tasks',usage:'fa-line-chart',history:'fa-history','question-bank':'fa-database',users:'fa-users',students:'fa-graduation-cap',resources:'fa-book',exams:'fa-file-text',attempts:'fa-check-square-o',monitoring:'fa-area-chart',tracks:'fa-road',activities:'fa-list', 'activity-submissions':'fa-inbox',prompts:'fa-comment',settings:'fa-cog',debug:'fa-bug'};
     $$('.nav-item').forEach(n=>{const ic=$('i',n);if(ic){ic.className='fa '+(iconMap[n.dataset.page]||'fa-circle');ic.textContent='';}});
     const splash=$('#parseStartup');if(splash){const mark=$('.mark',splash);if(mark){mark.innerHTML='<img src="/assets/Parseh_Language_Academy.png" alt="Parseh Language Academy">';}let dots=$('.dots',splash);if(!dots){dots=document.createElement('div');dots.className='dots';dots.innerHTML='<span></span><span></span><span></span>';splash.appendChild(dots);}setTimeout(()=>{splash.classList.add('done');splash.style.opacity='0';splash.style.visibility='hidden';splash.style.pointerEvents='none';setTimeout(()=>splash.remove(),450);},2000);}
     const initial=new URL(location.href).searchParams.get('page');if(initial&&$('#page-'+initial))showPage(initial,undefined,false);
@@ -1526,6 +1526,23 @@
     } catch(error) {
       toast('خطا در راه‌اندازی کنسول: '+error.message,'error');
     }
+  }
+
+
+  async function loadDebugLogs(){
+    if(!isDeveloperAdmin)return;
+    const host=$('#debugLogs'),status=$('#debugStatus'); if(!host)return;
+    status.textContent='در حال دریافت گزارش‌ها...';
+    try{const data=await api('/debug/logs');const rows=data.logs||[];status.textContent=rows.length+' رویداد (حداکثر ۵۰۰ مورد اخیر)';
+      host.innerHTML=rows.slice().reverse().map(r=>'<article style="border-bottom:1px solid var(--border);padding:12px"><b>'+escapeHtml(r.level||'log')+'</b> · '+escapeHtml(r.time||'')+'<div>'+escapeHtml(r.message||'')+'</div><small> '+escapeHtml(r.method||'')+' '+escapeHtml(r.uri||'')+' · IP '+escapeHtml(r.ip||'')+' · admin '+escapeHtml(r.admin_id||'—')+'</small><pre style="white-space:pre-wrap;overflow-wrap:anywhere">'+escapeHtml(JSON.stringify(r.context||{},null,2))+'</pre></article>').join('')||'<p>گزارشی ثبت نشده.</p>';
+    }catch(e){status.textContent='خواندن گزارش‌ها ناموفق: '+e.message;}
+  }
+  if(isDeveloperAdmin){
+    $('#debugRefresh')?.addEventListener('click',loadDebugLogs);
+    $('#debugClear')?.addEventListener('click',async()=>{if(!confirm('تمام گزارش‌های دیباگ پاک شوند؟'))return;try{await api('/debug/clear',{method:'POST',body:json({})});loadDebugLogs();}catch(e){toast(e.message,'error');}});
+    const sendDiag=(message,source,line,stack)=>{try{api('/debug/log',{method:'POST',body:json({message:String(message||''),source:String(source||''),line:Number(line||0),stack:String(stack||'')})}).catch(()=>{});}catch{}};
+    window.addEventListener('error',e=>sendDiag(e.message,e.filename,e.lineno,e.error?.stack));
+    window.addEventListener('unhandledrejection',e=>sendDiag('Unhandled promise rejection: '+String(e.reason),location.href,0,e.reason?.stack));
   }
 
   init();
