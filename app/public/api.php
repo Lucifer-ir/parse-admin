@@ -974,7 +974,7 @@ if ($method === 'POST' && $path === '/platform/exams') {
       $pdo->prepare('INSERT INTO exams(title,description,subject,level,track_id,duration_minutes,starts_at,ends_at,target_student_id,shuffle_questions,shuffle_options,show_result,passing_score,status,created_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
         ->execute([$title,trim((string)($body['description']??''))?:null,trim((string)($body['subject']??''))?:null,$resolvedLevel,$trackId,$duration,$start,$end,!empty($body['target_student_id'])?(int)$body['target_student_id']:null,!empty($body['shuffle_questions'])?1:0,!empty($body['shuffle_options'])?1:0,!empty($body['show_result'])?1:0,max(0,min(100,(float)($body['passing_score']??50))),$status,(int)$admin['id']]);
       $examId=(int)$pdo->lastInsertId();
-      $validStmt=$pdo->prepare('SELECT id FROM question_bank WHERE id=? AND status='published'');
+      $validStmt=$pdo->prepare("SELECT id FROM question_bank WHERE id=? AND status='published'");
       $link=$pdo->prepare('INSERT INTO exam_questions(exam_id,question_id,position,points) VALUES(?,?,?,?)');
       foreach($questionIds as $position=>$qid){$validStmt->execute([$qid]);if(!$validStmt->fetchColumn())throw new InvalidArgumentException('یکی از سؤال‌های انتخاب‌شده در بانک سؤال وجود ندارد.');$link->execute([$examId,$qid,$position+1,max(0.25,(float)($body['points'][$qid]??1))]);}
       $pdo->commit();
