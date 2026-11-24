@@ -110,7 +110,7 @@ function app_admin(): ?array
     $stmt = app_db()->prepare("SELECT id,email,role,active FROM users WHERE id=? LIMIT 1");
     $stmt->execute([(int)$_SESSION['admin_id']]);
     $user = $stmt->fetch();
-    if (!$user || !in_array((string)$user['role'], ['admin','developer_admin','education_admin'], true) || !(bool)$user['active']) {
+    if (!$user || !in_array((string)$user['role'], ['admin','developer_admin','education_admin','teacher'], true) || !(bool)$user['active']) {
         unset($_SESSION['admin_id']);
         return null;
     }
