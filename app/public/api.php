@@ -1133,7 +1133,7 @@ if ($method === 'POST' && $path === '/users') {
     $role = (string)($body['role'] ?? 'education_admin');
     if (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 190) app_json(422, ['error' => 'ایمیل مدیر معتبر نیست.']);
     if (strlen($password) < 14 || strlen($password) > 4096) app_json(422, ['error' => 'رمز عبور باید حداقل ۱۴ کاراکتر داشته باشد.']);
-    if (!in_array($role, ['developer_admin','education_admin'], true)) app_json(422, ['error' => 'نوع ادمین معتبر نیست.']);
+    if (!in_array($role, ['developer_admin','education_admin','teacher'], true)) app_json(422, ['error' => 'نوع ادمین معتبر نیست.']);
     $pdo = app_db(); $exists = $pdo->prepare('SELECT id FROM users WHERE email=? LIMIT 1'); $exists->execute([$email]);
     if ($exists->fetchColumn()) app_json(409, ['error' => 'حسابی با این ایمیل از قبل وجود دارد.']);
     $insert = $pdo->prepare('INSERT INTO users (email,password_hash,role,active) VALUES (?,?,?,1)');
