@@ -707,3 +707,34 @@ html,body{background:#f5f7fa!important;color:#182230!important}body{background:#
 @font-face{font-family:Meem;src:url('/assets/Meem-Medium.ttf') format('truetype');font-style:normal;font-weight:500;font-display:swap}
 @font-face{font-family:Meem;src:url('/assets/Meem-SemiBold.ttf') format('truetype');font-style:normal;font-weight:600 800;font-display:swap}
 html,body,button,input,textarea,select{font-family:Meem,system-ui,sans-serif}
+
+/* Parse sage textured redesign and reliable loader */
+:root{--parse-sage:#dce9d8;--parse-sage-mid:#b9d2b2;--parse-sage-dark:#466b50;--parse-sage-ink:#254536;--parse-accent:#789b70}
+body.app-page{background:#edf3ec!important;color:#263d32!important}
+.app-layout{background:#edf3ec!important}
+.sidebar{background:#f8fbf7!important;border-left:1px solid #d4e2d2!important;box-shadow:4px 0 26px rgba(48,78,54,.055)!important}
+.brand-symbol{background:linear-gradient(145deg,#799c72,#527d5b)!important;box-shadow:0 9px 22px #71966c35!important}
+.nav-item.active{background:#e1ecdf!important;color:#365d40!important;box-shadow:inset -3px 0 #789b70!important}.nav-item.active i{color:#527d5b!important}
+.workspace-switch{background:#eef5ed!important;border-color:#d5e3d3!important}
+.main-area,.page-view{background:transparent!important}
+.panel-card,.metric-card{background:#fbfdfb!important;border-color:#d8e4d7!important;box-shadow:0 4px 20px rgba(55,83,57,.055)!important}
+.button-primary{background:linear-gradient(135deg,#71956b,#527d5b)!important}
+.login-page{background:#e8f0e5!important;min-height:100vh!important;background-image:radial-gradient(#c9ddc5 1px,transparent 1px)!important;background-size:18px 18px!important}
+.login-shell{max-width:1100px!important;min-height:620px!important;grid-template-columns:1fr 1fr!important;border-radius:24px!important;border:1px solid #d2e2d0!important;box-shadow:0 24px 80px rgba(43,75,49,.12)!important;overflow:hidden!important;background:#fbfdfb!important}
+.login-side{display:flex!important;background:linear-gradient(145deg,#d9e8d5,#b8d1b1)!important;color:#254536!important;position:relative!important;overflow:hidden!important}
+.login-side:before{content:'';position:absolute;inset:0;background-image:radial-gradient(rgba(65,105,70,.14) 1px,transparent 1px);background-size:17px 17px;pointer-events:none}
+.login-card{background:#fbfdfb!important;padding:clamp(28px,5vw,58px)!important}
+.login-brand .brand-symbol{background:linear-gradient(145deg,#789b70,#527d5b)!important}
+.login-card h1{color:#284638!important}.login-card h1 span{color:#71956b!important}
+.login-submit{background:linear-gradient(135deg,#71956b,#527d5b)!important;border-radius:12px!important;box-shadow:0 10px 22px #73976d30!important}
+.field-wrap{border-radius:12px!important;border-color:#d4e2d2!important;background:#f9fcf8!important}
+.login-decoration{display:none!important}
+#parseStartup{position:fixed!important;inset:0!important;z-index:99999!important;display:flex!important;align-items:center!important;justify-content:center!important;flex-direction:column!important;gap:20px!important;background:#e5eee2!important;background-image:radial-gradient(#c3d9bf 1.25px,transparent 1.25px),linear-gradient(135deg,#e9f1e6,#dce9d8)!important;background-size:22px 22px,100% 100%!important;transition:opacity .28s ease,visibility .28s ease!important}
+#parseStartup:before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 50% 45%,rgba(126,163,119,.24),transparent 38%);pointer-events:none}
+#parseStartup .mark{position:relative;width:88px!important;height:88px!important;border-radius:26px!important;background:linear-gradient(145deg,#789b70,#527d5b)!important;color:#fff!important;display:grid!important;place-items:center!important;font-size:0!important;box-shadow:0 18px 45px rgba(64,104,70,.22)!important;border:1px solid rgba(255,255,255,.5)!important}
+#parseStartup .mark:after{content:'✦';font-size:40px;color:#f1f8ed;animation:parseMarkPulse 1.6s ease-in-out infinite}
+#parseStartup .spin{width:46px!important;height:46px!important;border:3px solid #b8d1b1!important;border-top-color:#466b50!important;border-right-color:#73966b!important;border-radius:50%!important;animation:parseSpin .85s linear infinite!important;position:relative}
+#parseStartup p{position:relative;color:#466b50!important;font-family:Meem,system-ui!important;font-size:14px!important;font-weight:500!important;letter-spacing:.1px!important}
+#parseStartup.done{opacity:0!important;visibility:hidden!important;pointer-events:none!important}
+@keyframes parseSpin{to{transform:rotate(360deg)}}@keyframes parseMarkPulse{0%,100%{transform:scale(.92);opacity:.75}50%{transform:scale(1.08);opacity:1}}
+@media(max-width:900px){.login-shell{grid-template-columns:1fr!important;min-height:unset!important}.login-side{display:none!important}}
