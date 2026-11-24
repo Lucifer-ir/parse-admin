@@ -187,3 +187,13 @@ function app_paasta_key(): string
 }
 
 app_session_start();
+
+/** Restricted diagnostics; never records passwords, tokens or request bodies. */
+function app_debug_log(string $level,string $message,array $context=[]):void {
+ $dir=dirname(__DIR__).'/backend/runtime'; if(!is_dir($dir)) @mkdir($dir,0750,true);
+ $entry=['time'=>gmdate('c'),'level'=>$level,'message'=>substr($message,0,500),'context'=>$context,'request_id'=>($_SERVER['HTTP_X_REQUEST_ID']??bin2hex(random_bytes(6))),'uri'=>substr((string)($_SERVER['REQUEST_URI']??''),0,300),'method'=>($_SERVER['REQUEST_METHOD']??''),'ip'=>substr((string)($_SERVER['REMOTE_ADDR']??''),0,45),'admin_id'=>($_SESSION['admin_id']??null)];
+ @file_put_contents($dir.'/debug.log',json_encode($entry,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)."\n",FILE_APPEND|LOCK_EX);
+}
+set_error_handler(function(int $severity,string $message,string $file,int $line):bool {if(!(error_reporting()&$severity))return false;app_debug_log('php-warning',$message,['severity'=>$severity,'file'=>basename($file),'line'=>$line]);return false;});
+set_exception_handler(function(Throwable $e):void {app_debug_log('exception',$e->getMessage(),['type'=>get_class($e),'file'=>basename($e->getFile()),'line'=>$e->getLine()]);if(!headers_sent()){http_response_code(500);header('Content-Type: application/json; charset=utf-8');}echo json_encode(['error'=>'خطای داخلی؛ جزئیات در بخش دیباگ ثبت شد.'],JSON_UNESCAPED_UNICODE);});
+register_shutdown_function(function():void{$e=error_get_last();if($e&&in_array($e['type'],[E_ERROR,E_PARSE,E_CORE_ERROR,E_COMPILE_ERROR],true))app_debug_log('fatal',$e['message'],['file'=>basename($e['file']),'line'=>$e['line']]);});
