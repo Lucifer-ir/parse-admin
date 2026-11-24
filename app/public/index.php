@@ -77,7 +77,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && ($_POST['action'] ?? '')
 
 $admin=app_admin();
 $isDeveloperAdmin = app_is_developer_admin($admin);
-$allPageNames = ["dashboard","models","questions","practice","review","playground","multimodal","structured","batches","usage","history","question-bank","users","students","resources","exams","attempts","monitoring","tracks","activities","activity-submissions","prompts","settings"];
+$allPageNames = ["dashboard","models","questions","practice","review","playground","multimodal","structured","batches","usage","history","question-bank","users","students","resources","exams","attempts","monitoring","tracks","activities","activity-submissions","prompts","settings","debug"];
 $educationPageNames = ['dashboard','questions','practice','review','question-bank','students','resources','exams','attempts','monitoring','tracks','activities','activity-submissions'];
 $pageAccess = array_fill_keys($allPageNames, $isDeveloperAdmin);
 $pageAccess['dashboard'] = true;
@@ -156,7 +156,7 @@ $assetVersion = max(
       <div class="nav-caption">استودیوی آموزشی</div><button class="nav-item" data-page="questions"><i>✧</i><span>تولید سؤال</span></button><button class="nav-item" data-page="practice"><i>▤</i><span>طراحی تمرین</span></button><button class="nav-item" data-page="review"><i>≋</i><span>بررسی و ویرایش متن</span></button><button class="nav-item" data-page="question-bank"><i>▤</i><span>بانک هوشمند سؤال</span></button><div class="nav-caption">مدیریت اپلیکیشن آموزشی</div>
 <?php endif; ?>
       <button class="nav-item" data-page="students"><i>♙</i><span>دانش‌آموزان</span></button><button class="nav-item" data-page="resources"><i>▣</i><span>کتاب‌ها و جزوه‌ها</span></button><button class="nav-item" data-page="exams"><i>◷</i><span>آزمون‌ها و زمان‌بندی</span></button><button class="nav-item" data-page="attempts"><i>✓</i><span>پاسخ‌نامه‌ها و نمرات</span></button><button class="nav-item" data-page="monitoring"><i>⌁</i><span>مانیتورینگ اپ</span></button><button class="nav-item" data-page="tracks"><i>⌘</i><span>زبان و مسیر آموزشی</span></button><button class="nav-item" data-page="activities"><i>▤</i><span>تمرین‌ها و تکالیف</span></button><button class="nav-item" data-page="activity-submissions"><i>✓</i><span>پاسخ تمرین‌ها</span></button>
-<?php if ($isDeveloperAdmin): ?><div class="nav-caption">پیکربندی سیستم</div><button class="nav-item" data-page="prompts"><i>✎</i><span>قالب‌های دستور AI</span></button><button class="nav-item" data-page="settings"><i>⚙</i><span>تنظیمات اتصال</span></button><?php endif; ?>
+<?php if ($isDeveloperAdmin): ?><div class="nav-caption">پیکربندی سیستم</div><button class="nav-item" data-page="debug"><i>⌁</i><span>دیباگ و خطاها</span></button><button class="nav-item" data-page="prompts"><i>✎</i><span>قالب‌های دستور AI</span></button><button class="nav-item" data-page="settings"><i>⚙</i><span>تنظیمات اتصال</span></button><?php endif; ?>
 </nav>
     <div class="sidebar-bottom"><div class="admin-mini"><div class="avatar"><?= app_e(mb_strtoupper(mb_substr((string)$admin['email'],0,1))) ?></div><div><b><?= app_e($admin['email']) ?></b><small><?= app_e($isDeveloperAdmin ? 'ادمین برنامه‌نویس' : 'ادمین آموزشی') ?></small></div></div><form method="post" action="/"><input type="hidden" name="action" value="logout"><input type="hidden" name="_csrf" value="<?= app_e($csrf) ?>"><button class="logout-button" type="submit">↪ خروج امن</button></form></div>
   </aside>
@@ -209,6 +209,7 @@ $assetVersion = max(
     <?php if (!empty($pageAccess['prompts'])) { $pageLocal = __DIR__ . '/pages/prompts.local.php'; $pageDefault = __DIR__ . '/pages/prompts.php'; require is_file($pageLocal) ? $pageLocal : $pageDefault; } ?>
 
     <?php if (!empty($pageAccess['settings'])) { $pageLocal = __DIR__ . '/pages/settings.local.php'; $pageDefault = __DIR__ . '/pages/settings.php'; require is_file($pageLocal) ? $pageLocal : $pageDefault; } ?>
+    <?php if ($isDeveloperAdmin) { require __DIR__ . '/pages/debug.php'; } ?>
     <footer class="app-footer"><span>PARSE ADMIN</span><span>Secure server-side console · <?= date('Y') ?></span></footer>
   </main>
 </div>
