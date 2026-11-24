@@ -142,7 +142,7 @@ $assetVersion = max(
 <?php else: ?>
 <div class="app-layout">
   <aside class="sidebar" id="sidebar">
-    <div class="sidebar-brand"><div class="brand-symbol">P<span></span></div><div><strong>PARSE<span>ADMIN</span></strong><small>CONTROL CENTER</small></div></div>
+    <div class="sidebar-brand"><img class="sidebar-logo" src="/assets/Parseh_Language_Academy.png" alt="Parseh Language Academy"></div>
     <div class="workspace-switch"><span class="workspace-dot"></span><span><b>Parse Workspace</b><small>فضای کاری اصلی</small></span><span class="chevron">⌄</span></div>
     <nav class="side-nav">
 <?php if ($isDeveloperAdmin): ?>
