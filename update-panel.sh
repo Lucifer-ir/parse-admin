@@ -36,7 +36,7 @@ git -C "$REPO_DIR" reset --hard origin/main
 for required in \
   app/bootstrap.php app/public/index.php app/public/api.php app/public/pages/dashboard.php app/public/pages/users.php app/public/assets/admin.css app/public/assets/admin.js \
   backend/config.php backend/schema.sql backend/public/index.php backend/platform_routes.php \
-  backend/bin/backup-db.sh backend/migrations/20261123_ai_console.sql backend/migrations/20261123_learning_platform.sql backend/migrations/20261123_tracks_and_activities.sql backend/migrations/20261124_language_levels_classes_audio.sql backend/migrations/20261124_admin_roles.sql; do
+  backend/bin/backup-db.sh backend/migrations/20261123_ai_console.sql backend/migrations/20261123_learning_platform.sql backend/migrations/20261123_tracks_and_activities.sql backend/migrations/20261124_language_levels_classes_audio.sql backend/migrations/20261124_admin_roles.sql backend/migrations/20261124_teacher_and_model_routes.sql; do
   [[ -s "$REPO_DIR/$required" ]] || { echo "Required application file missing: $required" >&2; exit 1; }
 done
 
