@@ -3,10 +3,13 @@ declare(strict_types=1);
 
 require_once dirname(__DIR__) . '/bootstrap.php';
 
-$admin = app_require_admin();
 $method = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET'));
 $path = (string)(parse_url((string)($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH) ?: '/');
 $path = preg_replace('#^/api(?=/|$)#', '', $path) ?: '/';
+$admin = app_require_admin();
+if ($path === '/debug/logs' && $method === 'GET') { app_require_developer_admin(); $file=dirname(__DIR__,2).'/backend/runtime/debug.log'; $rows=[]; if(is_file($file)){ $lines=array_slice(file($file,FILE_IGNORE_NEW_LINES|FILE_SKIP_EMPTY_LINES)?:[], -500); foreach($lines as $line){$row=json_decode($line,true);if(is_array($row))$rows[]=$row;} } app_json(200,['logs'=>$rows]); }
+if ($path === '/debug/log' && $method === 'POST') { app_require_developer_admin(); app_check_csrf(); $d=app_request_json(); app_debug_log('client-error',substr((string)($d['message']??'Client error'),0,500),['source'=>substr((string)($d['source']??''),0,250),'line'=>(int)($d['line']??0),'stack'=>substr((string)($d['stack']??''),0,1500)]); app_json(200,['ok'=>true]); }
+if ($path === '/debug/clear' && $method === 'POST') { app_require_developer_admin(); app_check_csrf(); $file=dirname(__DIR__,2).'/backend/runtime/debug.log'; if(is_file($file))@file_put_contents($file,''); app_json(200,['ok'=>true]); }
 
 if ($method !== 'GET') app_check_csrf();
 
