@@ -789,6 +789,6 @@ body.app-page{background:#edf3ec!important;color:#263d32!important}
 #parseStartup.done{transition:opacity .45s ease,visibility .45s ease!important}
 
 /* CSS-driven loader fallback: dismiss at 5s even when JS fails; smooth fade */
-#parseStartup{animation:parseSplashExit 5.45s forwards!important;}
+#parseStartup{animation:parseSplashExit 2.45s forwards!important;}
 @keyframes parseSplashExit{0%,91%{opacity:1;visibility:visible}100%{opacity:0;visibility:hidden;pointer-events:none}}
 #parseStartup:before{background-image:url('/assets/settings-svgrepo-com.svg'),url('/assets/delete-svgrepo-com.svg'),url('/assets/custom-lighting-effects-svgrepo-com.svg'),url('/assets/collection-file-svgrepo-com.svg'),url('/assets/loop-svgrepo-com.svg'),url('/assets/built-in-lighting-effects-svgrepo-com.svg'),url('/assets/feedback-svgrepo-com.svg')!important;background-size:22px 22px,20px 20px,24px 24px,22px 22px,20px 20px,22px 22px,24px 24px!important;background-position:3% 7%,17% 24%,33% 11%,48% 34%,64% 8%,79% 23%,94% 12%!important;background-repeat:repeat!important;opacity:.16!important;}
