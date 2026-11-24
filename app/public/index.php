@@ -106,7 +106,7 @@ $assetVersion = max(
 
 </head>
 <body class="<?= $admin ? 'app-page' : 'login-page' ?>">
-<div id="parseStartup"><div class="mark">P</div><div class="spin"></div><p>در حال آماده‌سازی Parse Admin</p></div>
+<div id="parseStartup"><div class="mark"><img src="/assets/Parseh_Language_Academy.png" alt="Parseh Language Academy"></div><div class="dots" aria-label="Loading"><span></span><span></span><span></span></div></div>
 <?php if (!$admin): ?>
 <div class="login-shell">
   <div class="login-decoration decor-one"></div><div class="login-decoration decor-two"></div>
