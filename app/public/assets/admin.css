@@ -913,3 +913,36 @@ body.app-page{background:#edf3ec!important;color:#263d32!important}
 
 /* Login input icons: use FA directly, without the legacy field-icon class */
 .login-form .field-wrap>i.fa{font-family:FontAwesome!important;font-size:16px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;flex:0 0 18px!important;width:18px!important;color:#0e6b68!important;}
+
+/* Parseh dashboard redesign */
+.page-view#page-dashboard{direction:rtl;}
+#page-dashboard .page-heading{display:flex;align-items:center;justify-content:space-between;gap:24px;margin-bottom:24px;padding:26px 28px;background:linear-gradient(135deg,#f8fbfa,#eaf3f0)!important;border:1px solid #d8e5e1!important;border-radius:20px!important;box-shadow:0 8px 28px rgba(20,75,67,.045)!important;color:#174e4a!important;}
+#page-dashboard .page-heading h1{color:#174e4a!important;font-size:25px!important;font-weight:800!important;margin:8px 0!important;}
+#page-dashboard .page-heading p{color:#64817b!important;margin:0!important;}
+#page-dashboard .eyebrow{color:#0e6b68!important;letter-spacing:.08em!important;font-weight:700!important;}
+#page-dashboard .date-pill{background:#fff!important;border:1px solid #d6e4df!important;color:#416b64!important;border-radius:999px!important;padding:10px 14px!important;}
+#page-dashboard .metric-grid{gap:16px!important;}
+#page-dashboard .metric-card{background:#fff!important;color:#174e4a!important;border:1px solid #dce8e4!important;border-radius:18px!important;padding:22px!important;box-shadow:0 8px 28px rgba(20,75,67,.05)!important;position:relative!important;overflow:hidden!important;transition:transform .18s ease,box-shadow .18s ease!important;}
+#page-dashboard .metric-card:hover{transform:translateY(-3px)!important;box-shadow:0 14px 32px rgba(20,75,67,.09)!important;}
+#page-dashboard .metric-top{display:flex!important;align-items:center!important;justify-content:space-between!important;color:#54736d!important;font-weight:700!important;}
+#page-dashboard .metric-top>i{display:grid!important;place-items:center!important;width:42px!important;height:42px!important;border-radius:13px!important;background:#e6f2ef!important;color:#0e6b68!important;font-size:18px!important;}
+#page-dashboard .metric-card strong{display:block!important;color:#174e4a!important;font-size:clamp(24px,2.4vw,32px)!important;font-weight:850!important;margin:16px 0 8px!important;}
+#page-dashboard .metric-card small{color:#78918b!important;}
+#page-dashboard .metric-foot{border-top:1px solid #edf2f0!important;margin-top:18px!important;padding-top:12px!important;color:#66827c!important;}
+#page-dashboard .panel-card{background:#fff!important;color:#174e4a!important;border:1px solid #dce8e4!important;border-radius:18px!important;padding:22px!important;box-shadow:0 8px 28px rgba(20,75,67,.045)!important;}
+#page-dashboard .panel-heading h3{color:#174e4a!important;font-size:17px!important;font-weight:800!important;}
+#page-dashboard .panel-heading p{color:#78918b!important;}
+#page-dashboard .dashboard-grid{gap:16px!important;margin-top:18px!important;}
+#page-dashboard .provider-logo{background:#e5f2ef!important;color:#0e6b68!important;border-radius:15px!important;display:grid!important;place-items:center!important;width:48px!important;height:48px!important;font-size:20px!important;}
+#page-dashboard .provider-meta{border-top:1px solid #edf2f0!important;color:#66827c!important;padding:14px 0!important;}
+#page-dashboard .provider-meta b{color:#174e4a!important;}
+#page-dashboard .status-badge{border-radius:999px!important;}
+#page-dashboard .table-panel{margin-top:18px!important;}
+#page-dashboard table{border-collapse:separate!important;border-spacing:0!important;}
+#page-dashboard table thead th{background:#edf5f2!important;color:#426b64!important;border-bottom:1px solid #dce8e4!important;}
+#page-dashboard table tbody td{color:#456a64!important;border-bottom:1px solid #edf2f0!important;}
+#page-dashboard .button,#page-dashboard .link-button{border-radius:12px!important;}
+#page-dashboard .inline-actions{gap:12px!important;flex-wrap:wrap!important;}
+#page-dashboard .inline-actions .button{display:inline-flex!important;align-items:center!important;gap:9px!important;}
+#page-dashboard .fa{font-family:FontAwesome!important;}
+@media(max-width:700px){#page-dashboard .page-heading{align-items:flex-start!important;flex-direction:column!important;padding:20px!important;}#page-dashboard .metric-grid{grid-template-columns:1fr 1fr!important;}#page-dashboard .panel-card{padding:16px!important;}}
