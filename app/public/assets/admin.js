@@ -89,32 +89,6 @@
     });
   }
 
-  function bindMobileDock() {
-    // Mobile bottom navigation dock removed; retain theme toggle and drawer menu.
-    $('#themeToggle,[data-theme-toggle]').forEach(button => {
-      if (button.dataset.bound) return;
-      button.dataset.bound = '1';
-      button.addEventListener('click', event => {
-        event.preventDefault();
-        applyTheme(!document.body.classList.contains('light-theme'));
-      });
-    });
-    const quickMenu = $('#quickMenu');
-    if (quickMenu && !quickMenu.dataset.bound) {
-      quickMenu.dataset.bound = '1';
-      quickMenu.addEventListener('click', event => {
-        event.preventDefault();
-        const menuButton = $('#mobileMenu');
-        if (menuButton) menuButton.click();
-      });
-    }
-    if (!document.body.dataset.themeInit) {
-      document.body.dataset.themeInit = '1';
-      try { applyTheme(localStorage.getItem('parse-theme') === 'light'); }
-      catch { applyTheme(false); }
-    }
-  }
-
   function showPage(page, label, updateUrl = true) { if(updateUrl){const url=new URL(location.href);url.searchParams.set('page',page);history.pushState({page},'',url);}
     const titles = {
       dashboard:'داشبورد', models:'کاتالوگ مدل‌ها', questions:'تولید سؤال', practice:'طراحی تمرین',
@@ -1521,12 +1495,10 @@
   function initNavigation() {
     const menuBtn=$('#mobileMenu'), side=$('#sidebar');
     if(menuBtn&&side){menuBtn.type='button';menuBtn.setAttribute('aria-label','باز کردن منو');menuBtn.setAttribute('aria-expanded','false');menuBtn.innerHTML='<i class="fa fa-bars" aria-hidden="true"></i>';menuBtn.addEventListener('click',(ev)=>{ev.preventDefault();ev.stopPropagation();const open=!side.classList.contains('open');side.classList.toggle('open',open);document.body.classList.toggle('nav-open',open);menuBtn.setAttribute('aria-expanded',open?'true':'false');});document.addEventListener('click',ev=>{if(side.classList.contains('open')&&!side.contains(ev.target)&&!menuBtn.contains(ev.target)){side.classList.remove('open');document.body.classList.remove('nav-open');menuBtn.setAttribute('aria-expanded','false');}});side.addEventListener('click',ev=>{if(ev.target.closest('.nav-item')&&window.innerWidth<=900){side.classList.remove('open');document.body.classList.remove('nav-open');menuBtn.setAttribute('aria-expanded','false');}});}
-    if(!$('#mobileNavDock')){const dock=document.createElement('nav');dock.id='mobileNavDock';dock.className='mobile-nav-dock';dock.setAttribute('aria-label','ناوبری سریع');const pages=[['dashboard','fa-home','خانه'],['students','fa-users','دانش‌آموز'],['questions','fa-magic','سؤال'],['exams','fa-file-text','آزمون'],['settings','fa-cog','تنظیمات']];dock.innerHTML=pages.filter(([page])=>$('.nav-item[data-page="'+page+'"]').length).map(([page,icon,label])=>'<button type="button" data-page="'+page+'"><i class="fa '+icon+'" aria-hidden="true"></i><span>'+label+'</span></button>').join('')+'<button type="button" data-theme-toggle aria-label="تغییر تم"><i class="fa fa-adjust" aria-hidden="true"></i><span>تم</span></button>';dock.addEventListener('click',ev=>{const themeBtn=ev.target.closest('[data-theme-toggle]');if(themeBtn){const light=document.body.classList.toggle('light-theme');try{localStorage.setItem('parse-theme',light?'light':'dark')}catch{};themeBtn.innerHTML=light?'<i class="fa fa-sun-o"></i><span>تم</span>':'<i class="fa fa-moon-o"></i><span>تم</span>';return;}const btn=ev.target.closest('button[data-page]');if(btn){showPage(btn.dataset.page);$('.mobile-nav-dock button[data-page]').forEach(x=>x.classList.toggle('active',x===btn));}});$('.main-area')?.append(dock);}
     $('#globalRefresh')?.addEventListener('click',()=>showPage(state.currentPage));$('#refreshDashboard')?.addEventListener('click',loadDashboard);if(!isDeveloperAdmin)return;$('#refreshModels')?.addEventListener('click',()=>loadCatalog($('#page-models .catalog-tab.active')?.dataset.catalog||'models',true));$('#modelSearch')?.addEventListener('input',()=>renderCatalog($('#page-models .catalog-tab.active')?.dataset.catalog||'models'));$('#loadUsage')?.addEventListener('click',loadUsage);$('#refreshHistory')?.addEventListener('click',loadHistory);$('#refreshUsers')?.addEventListener('click',loadUsers);$('#userSearch')?.addEventListener('input',()=>loadUsers());
   }
 
   async function init() {
-    bindMobileDock();
     const iconMap={dashboard:'fa-dashboard',models:'fa-cubes',questions:'fa-magic',practice:'fa-list',review:'fa-edit',playground:'fa-terminal',multimodal:'fa-picture-o',structured:'fa-code',batches:'fa-tasks',usage:'fa-line-chart',history:'fa-history','question-bank':'fa-database',users:'fa-users',students:'fa-graduation-cap',resources:'fa-book',exams:'fa-file-text',attempts:'fa-check-square-o',monitoring:'fa-area-chart',tracks:'fa-road',activities:'fa-list', 'activity-submissions':'fa-inbox',prompts:'fa-comment',settings:'fa-cog'};
     $$('.nav-item').forEach(n=>{const ic=$('i',n);if(ic){ic.className='fa '+(iconMap[n.dataset.page]||'fa-circle');ic.textContent='';}});
     const splash=$('#parseStartup');if(splash){const mark=$('.mark',splash);if(mark){mark.innerHTML='<img src="/assets/Parseh_Language_Academy.png" alt="Parseh Language Academy">';}let dots=$('.dots',splash);if(!dots){dots=document.createElement('div');dots.className='dots';dots.innerHTML='<span></span><span></span><span></span>';splash.appendChild(dots);}setTimeout(()=>{splash.classList.add('done');splash.style.opacity='0';splash.style.visibility='hidden';splash.style.pointerEvents='none';setTimeout(()=>splash.remove(),450);},2000);}
