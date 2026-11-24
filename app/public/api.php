@@ -386,7 +386,7 @@ if ($method === 'GET' && $path === '/platform/activities') {
 if ($method === 'POST' && $path === '/platform/activities') {
     $body=app_request_json();
     $title=trim((string)($body['title']??''));
-    $questionIds=array_values(array_unique(array_filter(array_map('intval',(array)($body['question_ids']??[])),static fn($id)=>$id>0)));
+    $questionIds=array_values(array_unique(array_filter(array_map('intval',(array)($body['question_ids']??[])),static fn($id)=>$id>0)));\n    $selectionMode=(string)($body['question_selection']??'manual');\n    $trackId=!empty($body['track_id'])?(int)$body['track_id']:null;\n    $resolvedLevel=platform_track_level(app_db(),$trackId);\n    if($selectionMode==='automatic'){ $count=min(100,max(1,(int)($body['question_count']??10)));$level=trim((string)($body['question_level']??''))?:($resolvedLevel?:null);$pdoSelect=app_db();$sql='SELECT q.id FROM question_bank q WHERE q.status=\'published\' AND (? IS NULL OR q.track_id=? OR q.track_id IS NULL) AND (? IS NULL OR q.level=?) AND (? IS NULL OR q.subject=?) AND q.id NOT IN (SELECT eq.question_id FROM exam_questions eq JOIN exams e ON e.id=eq.exam_id WHERE e.status<>\'closed\' AND (? IS NULL OR e.track_id=?) ) ORDER BY RAND() LIMIT '.$count;$st=$pdoSelect->prepare($sql);$sub=trim((string)($body['subject']??''))?:null;$st->execute([$trackId,$trackId,$level,$level,$sub,$sub,$trackId,$trackId]);$questionIds=array_map('intval',$st->fetchAll(PDO::FETCH_COLUMN));}\n
     if($title===''||count($questionIds)<1||count($questionIds)>200)app_json(422,['error'=>'عنوان و حداقل یک سؤال منتشرشده از بانک سؤال الزامی است.']);
     $type=($body['activity_type']??'practice')==='assignment'?'assignment':'practice';
     $due=trim((string)($body['due_at']??''))?:null;
@@ -949,7 +949,7 @@ if ($method === 'POST' && $path === '/platform/exams') {
     $title=trim((string)($body['title']??''));
     $questionIds=array_values(array_unique(array_filter(array_map('intval',(array)($body['question_ids']??[])),static fn($id)=>$id>0)));
     $duration=min(600,max(1,(int)($body['duration_minutes']??30)));
-    if($title===''||count($questionIds)<1||count($questionIds)>200)app_json(422,['error'=>'عنوان آزمون و حداقل یک سؤال از بانک سؤال الزامی است.']);
+    if($title===''||count($questionIds)<1||count($questionIds)>200)app_json(422,['error'=>$selectionMode==='automatic'?'با فیلترهای انتخاب‌شده سؤال کافی در بانک وجود ندارد.':'عنوان آزمون و حداقل یک سؤال از بانک سؤال الزامی است.']);
     $start=trim((string)($body['starts_at']??''))?:null;$end=trim((string)($body['ends_at']??''))?:null;
     if($start!==null&&$end!==null&&strtotime($end)<=strtotime($start))app_json(422,['error'=>'زمان پایان باید بعد از زمان شروع باشد.']);
     $status=in_array(($body['status']??'draft'),['draft','published','closed'],true)?$body['status']:'draft';
