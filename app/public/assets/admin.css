@@ -738,3 +738,18 @@ body.app-page{background:#edf3ec!important;color:#263d32!important}
 #parseStartup.done{opacity:0!important;visibility:hidden!important;pointer-events:none!important}
 @keyframes parseSpin{to{transform:rotate(360deg)}}@keyframes parseMarkPulse{0%,100%{transform:scale(.92);opacity:.75}50%{transform:scale(1.08);opacity:1}}
 @media(max-width:900px){.login-shell{grid-template-columns:1fr!important;min-height:unset!important}.login-side{display:none!important}}
+
+/* Parseh identity splash refresh */
+:root{--parse-brand:#0E6B68}
+#parseStartup{background-color:#e2eeeb!important;background-image:radial-gradient(circle,rgba(14,107,104,.17) 1px,transparent 1px),linear-gradient(135deg,#e5f0ed,#d8e8e5)!important;background-size:26px 26px,100% 100%!important;gap:18px!important}
+#parseStartup .mark{width:auto!important;height:auto!important;max-width:210px!important;max-height:120px!important;background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important;font-size:0!important;padding:0!important}
+#parseStartup .mark:after{content:none!important}
+#parseStartup .mark img{display:block!important;width:190px!important;max-width:70vw!important;height:auto!important;object-fit:contain!important}
+#parseStartup .spin{display:none!important}
+#parseStartup p{display:none!important}
+#parseStartup .dots{display:flex!important;align-items:center!important;gap:8px!important;height:20px!important}
+#parseStartup .dots span{width:7px;height:7px;border-radius:50%;background:#0E6B68;animation:parseDots 1.15s ease-in-out infinite}
+#parseStartup .dots span:nth-child(2){animation-delay:.16s}#parseStartup .dots span:nth-child(3){animation-delay:.32s}
+@keyframes parseDots{0%,80%,100%{opacity:.35;transform:translateY(0)}40%{opacity:1;transform:translateY(-5px)}}
+/* Low-density educational icon texture, not dot texture */
+#parseStartup:after{content:'';position:absolute;inset:0;pointer-events:none;opacity:.085;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'%3E%3Cg fill='%230E6B68' fill-opacity='1'%3E%3Cpath d='M34 28h26v5H34zM42 21h10v19H42z'/%3E%3Cpath d='M115 23l13 5 5 13-13 5-13-5 5-13z'/%3E%3Cpath d='M24 115h25v18H24zM29 110h15v5H29z'/%3E%3Cpath d='M119 112h22v22h-22zM124 107h12v5h-12z'/%3E%3Cpath d='M82 75l17 8v18l-17 8-17-8V83z'/%3E%3C/g%3E%3C/svg%3E")!important;background-size:180px 180px!important}
