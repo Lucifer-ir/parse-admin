@@ -384,62 +384,170 @@ if ($method === 'GET' && $path === '/platform/activities') {
 }
 
 if ($method === 'POST' && $path === '/platform/activities') {
-    $body=app_request_json();
-    $title=trim((string)($body['title']??''));
-    $questionIds=array_values(array_unique(array_filter(array_map('intval',(array)($body['question_ids']??[])),static fn($id)=>$id>0)));
-    $selectionMode=(string)($body['question_selection']??'manual');
-    $trackId=!empty($body['track_id'])?(int)$body['track_id']:null;
-    $resolvedLevel=platform_track_level(app_db(),$trackId);
-    if($selectionMode==='automatic'){ $count=min(100,max(1,(int)($body['question_count']??10)));$level=trim((string)($body['question_level']??''))?:($resolvedLevel?:null);$sub=trim((string)($body['subject']??''))?:null;$pdoSelect=app_db();$sql="SELECT q.id FROM question_bank q WHERE q.status='published' AND (? IS NULL OR q.track_id=? OR q.track_id IS NULL) AND (? IS NULL OR q.level=?) AND (? IS NULL OR q.subject=?) AND q.id NOT IN (SELECT eq.question_id FROM exam_questions eq JOIN exams e ON e.id=eq.exam_id WHERE e.status<>'closed' AND (? IS NULL OR e.track_id=?) ) ORDER BY RAND() LIMIT ".$count;$st=$pdoSelect->prepare($sql);$st->execute([$trackId,$trackId,$level,$level,$sub,$sub,$trackId,$trackId]);$questionIds=array_map('intval',$st->fetchAll(PDO::FETCH_COLUMN));}\n    $selectionMode=(string)($body['question_selection']??'manual');\n    $trackId=!empty($body['track_id'])?(int)$body['track_id']:null;\n    $resolvedLevel=platform_track_level(app_db(),$trackId);\n    if($selectionMode==='automatic'){ $count=min(100,max(1,(int)($body['question_count']??10)));$level=trim((string)($body['question_level']??''))?:($resolvedLevel?:null);$pdoSelect=app_db();$sql='SELECT q.id FROM question_bank q WHERE q.status=\'published\' AND (? IS NULL OR q.track_id=? OR q.track_id IS NULL) AND (? IS NULL OR q.level=?) AND (? IS NULL OR q.subject=?) AND q.id NOT IN (SELECT eq.question_id FROM exam_questions eq JOIN exams e ON e.id=eq.exam_id WHERE e.status<>\'closed\' AND (? IS NULL OR e.track_id=?) ) ORDER BY RAND() LIMIT '.$count;$st=$pdoSelect->prepare($sql);$sub=trim((string)($body['subject']??''))?:null;$st->execute([$trackId,$trackId,$level,$level,$sub,$sub,$trackId,$trackId]);$questionIds=array_map('intval',$st->fetchAll(PDO::FETCH_COLUMN));}\n
-    if($title===''||count($questionIds)<1||count($questionIds)>200)app_json(422,['error'=>'عنوان و حداقل یک سؤال منتشرشده از بانک سؤال الزامی است.']);
-    $type=($body['activity_type']??'practice')==='assignment'?'assignment':'practice';
-    $due=trim((string)($body['due_at']??''))?:null;
-    if($due!==null){$due=str_replace('T',' ',$due);if(strlen($due)===16)$due.=':00';}
-    $status=in_array(($body['status']??'draft'),['draft','published','closed'],true)?$body['status']:'draft';
-    $pdo=app_db();
-    $trackId=!empty($body['track_id'])?(int)$body['track_id']:null;
-    $resolvedLevel=platform_track_level($pdo,$trackId);
-    $pdo->beginTransaction();
-    try{
-      $pdo->prepare('INSERT INTO learning_activities(activity_type,title,description,subject,level,track_id,instructions,due_at,status,created_by) VALUES(?,?,?,?,?,?,?,?,?,?)')
-       ->execute([$type,$title,trim((string)($body['description']??''))?:null,trim((string)($body['subject']??''))?:null,$resolvedLevel,$trackId,trim((string)($body['instructions']??''))?:null,$due,$status,(int)$admin['id']]);
-      $activityId=(int)$pdo->lastInsertId();
-      $valid=$pdo->prepare('SELECT id FROM question_bank WHERE id=? AND status=\'published\'');
-      $link=$pdo->prepare('INSERT INTO activity_questions(activity_id,question_id,position) VALUES(?,?,?)');
-      foreach($questionIds as $index=>$qid){$valid->execute([$qid]);if(!$valid->fetchColumn())throw new InvalidArgumentException('تمام سؤال‌ها باید ابتدا در بانک سؤال منتشر شوند.');$link->execute([$activityId,$qid,$index+1]);}
-      $targetIds=array_values(array_unique(array_filter(array_map('intval',(array)($body['target_student_ids']??[])),static fn($id)=>$id>0)));
-      if(!empty($body['target_student_id']))$targetIds[]=(int)$body['target_student_id'];
-      $targetIds=array_values(array_unique($targetIds));
-      if(!$targetIds){
-        if($trackId!==null){
-          $query=$pdo->prepare("SELECT id FROM students WHERE status='active' AND track_id=?");
-          $query->execute([$trackId]);
-        }elseif($resolvedLevel!==null){
-          $query=$pdo->prepare("SELECT id FROM students WHERE status='active' AND level=?");
-          $query->execute([$resolvedLevel]);
-        }else{
-          $query=$pdo->query("SELECT id FROM students WHERE status='active'");
-        }
-        $targetIds=array_map('intval',$query->fetchAll(PDO::FETCH_COLUMN));
-      }
-      if(count($targetIds)>10000)throw new InvalidArgumentException('تعداد دانش‌آموزان هدف بیش از حد مجاز است.');
-      $assign=$pdo->prepare('INSERT IGNORE INTO student_activity_assignments(activity_id,student_id) VALUES(?,?)');
-      $studentCheck=$pdo->prepare("SELECT id FROM students WHERE id=? AND status='active'");
-      foreach($targetIds as $sid){$studentCheck->execute([$sid]);if($studentCheck->fetchColumn())$assign->execute([$activityId,$sid]);}
-      $pdo->commit();
-    }catch(Throwable $e){
-      if($pdo->inTransaction())$pdo->rollBack();
-      if($e instanceof InvalidArgumentException)app_json(422,['error'=>$e->getMessage()]);
-      throw $e;
-    }
-    app_json(201,['ok'=>true,'id'=>$activityId,'assigned_students'=>count($targetIds)]);
-}
+    $body = app_request_json();
+    $title = trim((string)($body['title'] ?? ''));
 
-if ($method === 'POST' && preg_match('#^/platform/activities/([1-9][0-9]*)/status$#',$path,$m)) {
-    $id=(int)$m[1];$body=app_request_json();$status=(string)($body['status']??'');
-    if(!in_array($status,['draft','published','closed'],true))app_json(422,['error'=>'وضعیت تمرین معتبر نیست.']);
-    app_db()->prepare('UPDATE learning_activities SET status=? WHERE id=?')->execute([$status,$id]);
-    app_json(200,['ok'=>true]);
+    $questionIds = array_values(array_unique(array_filter(
+        array_map('intval', (array)($body['question_ids'] ?? [])),
+        static fn($id) => $id > 0
+    )));
+
+    $selectionMode = (string)($body['question_selection'] ?? 'manual');
+    $trackId = !empty($body['track_id']) ? (int)$body['track_id'] : null;
+    $resolvedLevel = platform_track_level(app_db(), $trackId);
+
+    if ($selectionMode === 'automatic') {
+        $count = min(100, max(1, (int)($body['question_count'] ?? 10)));
+        $level = trim((string)($body['question_level'] ?? '')) ?: ($resolvedLevel ?: null);
+        $subject = trim((string)($body['subject'] ?? '')) ?: null;
+
+        $sql = '
+            SELECT q.id
+            FROM question_bank q
+            WHERE q.status = "published"
+              AND (? IS NULL OR q.track_id = ? OR q.track_id IS NULL)
+              AND (? IS NULL OR q.level = ?)
+              AND (? IS NULL OR q.subject = ?)
+              AND q.id NOT IN (
+                  SELECT aq.question_id
+                  FROM activity_questions aq
+                  JOIN learning_activities a ON a.id = aq.activity_id
+                  WHERE a.status <> "closed"
+                    AND (? IS NULL OR a.track_id = ?)
+              )
+            ORDER BY RAND()
+            LIMIT ' . $count;
+
+        $statement = app_db()->prepare($sql);
+        $statement->execute([$trackId, $trackId, $level, $level, $subject, $subject, $trackId, $trackId]);
+        $questionIds = array_map('intval', $statement->fetchAll(PDO::FETCH_COLUMN));
+    }
+
+    if ($title === '' || count($questionIds) < 1 || count($questionIds) > 200) {
+        app_json(422, ['error' => 'عنوان و حداقل یک سؤال منتشرشده از بانک سؤال الزامی است.']);
+    }
+
+    $type = ($body['activity_type'] ?? 'practice') === 'assignment' ? 'assignment' : 'practice';
+    $due = trim((string)($body['due_at'] ?? '')) ?: null;
+
+    if ($due !== null) {
+        $due = str_replace('T', ' ', $due);
+        if (strlen($due) === 16) {
+            $due .= ':00';
+        }
+    }
+
+    $status = in_array(($body['status'] ?? 'draft'), ['draft', 'published', 'closed'], true)
+        ? $body['status']
+        : 'draft';
+
+    $pdo = app_db();
+    $pdo->beginTransaction();
+
+    try {
+        $insertActivity = $pdo->prepare(
+            'INSERT INTO learning_activities
+                (activity_type, title, description, subject, level, track_id, instructions, due_at, status, created_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        );
+
+        $insertActivity->execute([
+            $type,
+            $title,
+            trim((string)($body['description'] ?? '')) ?: null,
+            trim((string)($body['subject'] ?? '')) ?: null,
+            $resolvedLevel,
+            $trackId,
+            trim((string)($body['instructions'] ?? '')) ?: null,
+            $due,
+            $status,
+            (int)$admin['id']
+        ]);
+
+        $activityId = (int)$pdo->lastInsertId();
+        $validQuestion = $pdo->prepare(
+            'SELECT id FROM question_bank WHERE id = ? AND status = "published"'
+        );
+        $linkQuestion = $pdo->prepare(
+            'INSERT INTO activity_questions (activity_id, question_id, position) VALUES (?, ?, ?)'
+        );
+
+        foreach ($questionIds as $index => $questionId) {
+            $validQuestion->execute([$questionId]);
+
+            if (!$validQuestion->fetchColumn()) {
+                throw new InvalidArgumentException('تمام سؤال‌ها باید ابتدا در بانک سؤال منتشر شوند.');
+            }
+
+            $linkQuestion->execute([$activityId, $questionId, $index + 1]);
+        }
+
+        $targetIds = array_values(array_unique(array_filter(
+            array_map('intval', (array)($body['target_student_ids'] ?? [])),
+            static fn($id) => $id > 0
+        )));
+
+        if (!empty($body['target_student_id'])) {
+            $targetIds[] = (int)$body['target_student_id'];
+        }
+
+        $targetIds = array_values(array_unique($targetIds));
+
+        if (!$targetIds) {
+            if ($trackId !== null) {
+                $targetQuery = $pdo->prepare(
+                    "SELECT id FROM students WHERE status = 'active' AND track_id = ?"
+                );
+                $targetQuery->execute([$trackId]);
+            } elseif ($resolvedLevel !== null) {
+                $targetQuery = $pdo->prepare(
+                    "SELECT id FROM students WHERE status = 'active' AND level = ?"
+                );
+                $targetQuery->execute([$resolvedLevel]);
+            } else {
+                $targetQuery = $pdo->query("SELECT id FROM students WHERE status = 'active'");
+            }
+
+            $targetIds = array_map('intval', $targetQuery->fetchAll(PDO::FETCH_COLUMN));
+        }
+
+        if (count($targetIds) > 10000) {
+            throw new InvalidArgumentException('تعداد دانش‌آموزان هدف بیش از حد مجاز است.');
+        }
+
+        $assignStudent = $pdo->prepare(
+            'INSERT IGNORE INTO student_activity_assignments (activity_id, student_id) VALUES (?, ?)'
+        );
+        $activeStudent = $pdo->prepare(
+            "SELECT id FROM students WHERE id = ? AND status = 'active'"
+        );
+
+        foreach ($targetIds as $studentId) {
+            $activeStudent->execute([$studentId]);
+
+            if ($activeStudent->fetchColumn()) {
+                $assignStudent->execute([$activityId, $studentId]);
+            }
+        }
+
+        $pdo->commit();
+    } catch (Throwable $exception) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+
+        if ($exception instanceof InvalidArgumentException) {
+            app_json(422, ['error' => $exception->getMessage()]);
+        }
+
+        throw $exception;
+    }
+
+    app_json(201, [
+        'ok' => true,
+        'id' => $activityId,
+        'assigned_students' => count($targetIds)
+    ]);
 }
 
 if ($method === 'GET' && $path === '/platform/activity-submissions') {
