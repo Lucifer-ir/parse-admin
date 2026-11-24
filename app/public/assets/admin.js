@@ -1092,7 +1092,8 @@
       finally { setBusy(form,false); }
     });
 
-    $('#examCreateForm [name="question_selection"]')?.addEventListener('change',ev=>{const auto=ev.target.value==='automatic';$('#examManualQuestions').style.display=auto?'none':'';$('#examManualQuestions input').required=!auto;$('#examAutoLevel').style.display=auto?'':'none';});\n    $('#examCreateForm').addEventListener('submit',async event=>{
+    $('#examCreateForm [name="question_selection"]')?.addEventListener('change',ev=>{const auto=ev.target.value==='automatic';$('#examManualQuestions').style.display=auto?'none':'';$('#examManualQuestions input').required=!auto;$('#examAutoLevel').style.display=auto?'':'none';});
+    $('#examCreateForm').addEventListener('submit',async event=>{
       event.preventDefault();const form=event.currentTarget;const data=payloadFromForm(form);
       data.question_ids=String(data.question_ids||'').split(',').map(x=>Number(x.trim())).filter(x=>Number.isInteger(x)&&x>0);data.question_count=Number(data.question_count||10);
       data.duration_minutes=Number(data.duration_minutes);data.passing_score=Number(data.passing_score);
