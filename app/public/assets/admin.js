@@ -1540,7 +1540,8 @@
     const initial=new URL(location.href).searchParams.get('page');if(initial&&$('#page-'+initial))showPage(initial,undefined,false);
     window.addEventListener('popstate',()=>{const p=new URL(location.href).searchParams.get('page')||'dashboard';if($('#page-'+p))showPage(p,undefined,false);});
 
-    bindPlatformForms();\n    bindModelTestForms();
+    bindPlatformForms();
+    bindModelTestForms();
     bindPlatformTables();
     initPlatformNavigation();
     const label=new Date().toLocaleDateString('fa-IR',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
