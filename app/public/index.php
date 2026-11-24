@@ -122,7 +122,7 @@ $assetVersion = max(
       <label for="password">رمز عبور</label><div class="field-wrap"><i class="field-icon fa fa-lock" aria-hidden="true"></i><input id="password" name="password" type="password" autocomplete="current-password" placeholder="رمز عبور حساب مدیر" required></div>
       <button class="login-submit" type="submit"><span>ورود امن به پنل</span><i class="fa fa-arrow-left" aria-hidden="true"></i></button>
     </form>
-    <div class="login-foot"><i class="shield fa fa-shield" aria-hidden="true"></i> ارتباط امن با نشست سمت سرور · محافظت‌شده با HTTPS</div>
+    <div class="login-foot">ارتباط امن با نشست سمت سرور · محافظت‌شده با HTTPS</div>
   </section>
   <aside class="login-side">
     <div class="orb orb-a"></div><div class="orb orb-b"></div>
