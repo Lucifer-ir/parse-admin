@@ -1417,7 +1417,7 @@
   }
 
   function initNavigation() {
-    $('#mobileMenu').addEventListener('click',()=>$('#sidebar').classList.toggle('open'));
+    $('#mobileMenu').addEventListener('click',()=>{const side=$('#sidebar');side.classList.toggle('open');document.body.classList.toggle('nav-open',side.classList.contains('open'));}); document.addEventListener('click',e=>{const side=$('#sidebar');if(side?.classList.contains('open')&&!side.contains(e.target)&&!$('#mobileMenu').contains(e.target)){side.classList.remove('open');document.body.classList.remove('nav-open');}}); $('.nav-item').forEach(n=>n.addEventListener('click',()=>{if(window.innerWidth<=900){$('#sidebar')?.classList.remove('open');document.body.classList.remove('nav-open');}})); if(!$('#mobileNavDock')){const dock=document.createElement('nav');dock.id='mobileNavDock';dock.className='mobile-nav-dock';dock.setAttribute('aria-label','ناوبری سریع');const items=[['dashboard','fa-dashboard','داشبورد'],['students','fa-users','دانش‌آموزان'],['questions','fa-magic','سؤال'],['exams','fa-file-text','آزمون'],['settings','fa-cog','تنظیمات']].filter(([page])=>!!$('#page-'+page)&&$('.nav-item[data-page="'+page+'"]').length);dock.innerHTML=items.map(([page,icon,label])=>'<button type="button" data-page="'+page+'"><i class="fa '+icon+'" aria-hidden="true"></i><span>'+label+'</span></button>').join('');document.querySelector('.main-area')?.append(dock);dock.addEventListener('click',e=>{const b=e.target.closest('button[data-page]');if(b)showPage(b.dataset.page);});}
     $('#globalRefresh').addEventListener('click',()=>showPage(state.currentPage));
     $('#refreshDashboard').addEventListener('click',loadDashboard);
     if (!isDeveloperAdmin) return;
