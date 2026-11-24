@@ -301,7 +301,6 @@
     attachGenerate('questionForm','question','#questionOutput','#questionMessage','#questionUsage','تولید سؤال');
     attachGenerate('practiceForm','practice','#practiceOutput','#practiceMessage','#practiceUsage','طراحی تمرین');
     attachGenerate('reviewForm','review','#reviewOutput','#reviewMessage','#reviewUsage','بررسی متن');
-    if (!isDeveloperAdmin) return;
 
     $('#saveQuestions').addEventListener('click', async () => {
       const text = $('#questionOutput').textContent.trim();
@@ -315,6 +314,8 @@
         toast(number(result.saved) + ' مورد به بانک سؤال اضافه شد.', 'success');
       } catch(error) { toast(error.message,'error'); }
     });
+
+    if (!isDeveloperAdmin) return;
 
     function parseAdvancedOptions(data) {
       const parseJsonField = (field, target) => {
