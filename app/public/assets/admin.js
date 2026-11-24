@@ -725,7 +725,9 @@
     });
   }
 
-  async function loadModelRouting(boot){try{const [data,catalog]=await Promise.all([api('/model-routing'),api('/catalog/models')]);const models=catalog.models||catalog.rows||catalog.data||[];const opts='<option value="">مدل پیش‌فرض</option>'+models.map(m=>'<option value="'+escapeHtml(m.id||m.name)+'">'+escapeHtml(m.id||m.name)+'</option>').join('');const current=Object.fromEntries((data.rows||[]).map(r=>[r.operation_key,r.model_id]));$('.route-model').forEach(s=>{s.innerHTML=opts;s.value=current[s.name]||'';});}catch(e){setMessage('#modelRoutingMessage',e.message,'error');}}\n\n  async function loadSettings() {
+  async function loadModelRouting(boot){try{const [data,catalog]=await Promise.all([api('/model-routing'),api('/catalog/models')]);const models=catalog.models||catalog.rows||catalog.data||[];const opts='<option value="">مدل پیش‌فرض</option>'+models.map(m=>'<option value="'+escapeHtml(m.id||m.name)+'">'+escapeHtml(m.id||m.name)+'</option>').join('');const current=Object.fromEntries((data.rows||[]).map(r=>[r.operation_key,r.model_id]));$('.route-model').forEach(s=>{s.innerHTML=opts;s.value=current[s.name]||'';});}catch(e){setMessage('#modelRoutingMessage',e.message,'error');}}
+
+  async function loadSettings() {
     try {
       const [settings, boot] = await Promise.all([api('/settings'),api('/bootstrap')]);
       state.bootstrap = boot;
