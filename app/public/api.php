@@ -846,7 +846,7 @@ if ($method === 'POST' && $path === '/platform/questions/generate') {
     $qType = platform_question_type((string)($body['question_type'] ?? 'multiple_choice'));
     $subject = trim((string)($body['subject'] ?? 'عمومی'));
     $trackId = !empty($body['track_id']) ? (int)$body['track_id'] : null;
-    $level = platform_track_level(app_db(), $trackId) ?? '';
+    $level = platform_track_level(app_db(), $trackId) ?? '';\n    $languageCode='fa'; $languageName='فارسی';\n    if($trackId){$langStmt=app_db()->prepare('SELECT l.language_code,l.language_name,l.native_name FROM learning_tracks t LEFT JOIN learning_languages l ON l.language_code=t.language_code WHERE t.id=? LIMIT 1');$langStmt->execute([$trackId]);$langRow=$langStmt->fetch();if($langRow){$languageCode=(string)($langRow['language_code']??'fa');$languageName=(string)($langRow['native_name']?:($langRow['language_name']?:$languageCode));}}\n    $outputLanguage = match(strtolower($languageCode)){ 'en'=>'English','fr'=>'French','de'=>'German','es'=>'Spanish','it'=>'Italian','pt'=>'Portuguese','ru'=>'Russian','tr'=>'Turkish','ar'=>'Arabic','fa'=>'Persian','ja'=>'Japanese','zh'=>'Chinese', default=>$languageName };
     $targetStudentId = !empty($body['target_student_id']) ? (int)$body['target_student_id'] : null;
     if ($model === '') $model = (string)(app_db()->query('SELECT default_model FROM ai_provider_settings WHERE id=1')->fetchColumn() ?: '');
     if ($model === '') app_json(422, ['error' => 'مدل پیش‌فرض هوش مصنوعی هنوز توسط ادمین برنامه‌نویس تنظیم نشده است.']);
@@ -867,8 +867,8 @@ if ($method === 'POST' && $path === '/platform/questions/generate') {
     ];
     $prompt = "از محتوای منبع زیر فقط سؤال آموزشی بساز. موضوع: {$subject}. سطح: {$level}. دشواری: ".(string)($body['difficulty'] ?? 'medium').". نوع: {$qType}. تعداد: {$count}. مهارت: ".(string)($body['skill'] ?? 'general').".\n"
       .$typeRules[$qType]."\n"
-      ."فقط JSON معتبر و بدون Markdown برگردان با ساختار {\\\"questions\\\":[{\\\"question_text\\\":\\\"...\\\",\\\"question_type\\\":\\\"{$qType}\\\",\\\"options\\\":[],\\\"correct_answer\\\":\\\"...\\\",\\\"explanation\\\":\\\"...\\\",\\\"difficulty\\\":\\\"easy|medium|hard\\\",\\\"points\\\":1}]}. متن سؤال و گزینه‌ها را فارسی و روشن بنویس. هیچ دانسته‌ای خارج از منبع را به منبع نسبت نده.\\n\\nمنبع: ".$sourceText;
-    $system = 'You are an expert assessment designer. Return valid JSON only. Follow the requested question type exactly. Never add Markdown fences.';
+      ."فقط JSON معتبر و بدون Markdown برگردان با ساختار {\\\"questions\\\":[{\\\"question_text\\\":\\\"...\\\",\\\"question_type\\\":\\\"{$qType}\\\",\\\"options\\\":[],\\\"correct_answer\\\":\\\"...\\\",\\\"explanation\\\":\\\"...\\\",\\\"difficulty\\\":\\\"easy|medium|hard\\\",\\\"points\\\":1}]}. متن سؤال، گزینه‌ها، پاسخ و توضیحات را به زبان {$outputLanguage} بنویس. زبان را تغییر نده. هیچ دانسته‌ای خارج از منبع را به منبع نسبت نده.\\n\\nمنبع: ".$sourceText;
+    $system = 'You are an expert assessment designer. Produce all educational content in the specified output language: '.$outputLanguage.'. Return valid JSON only. Follow the requested question type exactly. Never add Markdown fences.';
     $call = ai_paasta_call($admin,'structured_question_generation','POST','/chat/completions',[
       'model'=>$model,'messages'=>[['role'=>'system','content'=>$system],['role'=>'user','content'=>$prompt]],
       'max_tokens'=>min(8192,max(1200,$count*500)),'temperature'=>0.35,
@@ -1215,7 +1215,7 @@ if ($method === 'DELETE' && preg_match('#^/questions/([1-9][0-9]*)$#',$path,$mat
     app_json(200,['deleted'=>$deleted]);
 }
 
-if ($method === 'GET' && $path === '/settings') {
+if ($method === 'GET' && $path === '/model-routing') { $rows=app_db()->query('SELECT operation_key,model_id FROM ai_operation_model_routes ORDER BY operation_key')->fetchAll(); app_json(200,['rows'=>$rows]); }\nif ($method === 'POST' && $path === '/model-routing') { $body=app_request_json(); $routes=$body['routes']??[]; if(!is_array($routes))app_json(422,['error'=>'تنظیم مسیر مدل معتبر نیست.']); $pdo=app_db(); $pdo->beginTransaction(); try{foreach($routes as $key=>$model){if(!preg_match('/^[a-z0-9_-]{2,60}$/',(string)$key))continue;$model=trim((string)$model);$stmt=$pdo->prepare('INSERT INTO ai_operation_model_routes(operation_key,model_id) VALUES(?,?) ON DUPLICATE KEY UPDATE model_id=VALUES(model_id)');$stmt->execute([(string)$key,$model]);}$pdo->commit();}catch(Throwable $e){$pdo->rollBack();app_json(500,['error'=>'ذخیره تنظیم مدل‌ها انجام نشد.']);}app_json(200,['ok'=>true,'message'=>'مدل‌های اختصاصی عملیات ذخیره شدند.']);}\nif ($method === 'GET' && $path === '/settings') {
     $row = app_db()->query('SELECT default_model,api_key_ciphertext,updated_at FROM ai_provider_settings WHERE id=1')->fetch() ?: [];
     app_json(200, [
         'configured' => !empty($row['api_key_ciphertext']),
