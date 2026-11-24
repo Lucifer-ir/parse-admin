@@ -910,3 +910,6 @@ body.app-page{background:#edf3ec!important;color:#263d32!important}
 /* Font Awesome 4.7 uses .fa, not .fa-solid; keep real glyphs visible */
 .field-icon{font-family:FontAwesome!important;font-size:16px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;color:#0e6b68!important;}
 .login-submit>.fa{font-family:FontAwesome!important;font-size:15px!important;display:inline-block!important;}
+
+/* Login input icons: use FA directly, without the legacy field-icon class */
+.login-form .field-wrap>i.fa{font-family:FontAwesome!important;font-size:16px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;flex:0 0 18px!important;width:18px!important;color:#0e6b68!important;}
