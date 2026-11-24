@@ -188,6 +188,14 @@ app/
   public/
     index.php
     api.php
+    pages/                 # each panel section is an independent PHP file
+      dashboard.php
+      questions.php
+      practice.php
+      review.php
+      students.php
+      exams.php
+      ...
     assets/admin.css
     assets/admin.js
 backend/
@@ -201,6 +209,24 @@ install.sh
 update-panel.sh
 ```
 
+## نقش‌های ادمین
+
+- **ادمین برنامه‌نویس (`developer_admin`)**: دسترسی کامل به تمام بخش‌ها، تنظیمات Provider، کاتالوگ مدل‌ها، Playground، گزارش توکن و هزینه، مدیریت مدیران و قابلیت‌های آموزشی.
+- **ادمین آموزشی (`education_admin`)**: داشبورد آموزشی، تولید سؤال و تمرین، بررسی متن، بانک سؤال، دانش‌آموزان، منابع، آزمون‌ها، پاسخ‌نامه‌ها، مسیرها، فعالیت‌ها و مانیتورینگ آموزشی. گزارش مصرف و هزینه، تنظیمات سرویس، کلید API، کاتالوگ مدل‌ها و مدیریت مدیران برای این نقش مسدود است.
+
+ادمین برنامه‌نویس از بخش «مدیریت مدیران» حساب جدید می‌سازد و نقش را انتخاب می‌کند. رمز اولیه حداقل ۱۴ کاراکتر است. حساب‌های قدیمی با نقش `admin` در migration به `developer_admin` تبدیل می‌شوند تا دسترسی کامل‌شان حفظ شود.
+
+## ویرایش دستی صفحات
+
+هر بخش پنل یک فایل مستقل در `app/public/pages/` دارد. برای سفارشی‌سازی صفحه، نسخه محلی بسازید:
+
+```bash
+cd /opt/parse-admin/app/public/pages
+cp exams.php exams.local.php
+nano exams.local.php
+```
+
+فایل `*.local.php` بر نسخه اصلی اولویت دارد و در `.gitignore` قرار دارد؛ بنابراین به‌روزرسانی ریپو آن را بازنویسی نمی‌کند. برای بازگشت به نسخه اصلی، فایل محلی را حذف کنید. فایل‌های صفحات فقط از طریق `index.php` بارگذاری می‌شوند و Nginx درخواست مستقیم به آن‌ها را مسدود می‌کند.
 ## CI
 
 GitHub Actions فایل‌های PHP، JavaScript و اسکریپت‌های Bash را از نظر syntax بررسی می‌کند. این بررسی جایگزین تست عملی اتصال Provider، مرورگر و دیتابیس روی سرور production نیست.

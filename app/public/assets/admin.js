@@ -4,6 +4,7 @@
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
   const csrf = $('meta[name="csrf-token"]')?.content || '';
+  const isDeveloperAdmin = ['developer_admin','admin'].includes($('meta[name="admin-role"]')?.content || '');
   const state = { catalogs: {}, lastQuestionOutput: '', bootstrap: null, currentPage: 'dashboard', users: [], questions: [], prompts: [], students: [], resources: [], exams: [], attempts: [], tracks: [], activities: [], activitySubmissions: [], platformSettings: {} };
   const number = value => Number(value || 0).toLocaleString('fa-IR');
   const money = value => Number(value || 0).toLocaleString('fa-IR', { maximumFractionDigits: 2 });
@@ -93,7 +94,7 @@
     if (page === 'activities') { loadActivities(); loadTracks(); loadStudents(); loadPlatformQuestionBank(); }
     if (page === 'activity-submissions') loadActivitySubmissions();
     if (page === 'question-bank') { loadPlatformQuestionBank(); loadResources(); loadStudents(); loadTracks(); }
-    if (page === 'questions' || page === 'practice' || page === 'review' || page === 'playground') {
+    if (isDeveloperAdmin && (page === 'questions' || page === 'practice' || page === 'review' || page === 'playground')) {
       if (!state.catalogs.models) loadCatalog('models');
     }
   }
@@ -228,39 +229,35 @@
   }
 
   async function loadDashboard() {
-    try {
-      const [data, boot] = await Promise.all([api('/dashboard'), api('/bootstrap')]);
-      state.bootstrap = boot;
-      $('#todayCost').textContent = money(data.today?.cost);
-      $('#todayRequests').textContent = number(data.today?.requests) + ' درخواست';
-      $('#monthCost').textContent = money(data.month?.cost);
-      $('#monthRequests').textContent = number(data.month?.requests) + ' درخواست';
-      $('#monthTokens').textContent = number(data.month?.tokens);
-      $('#allRequests').textContent = number(data.totals?.requests) + ' درخواست کل';
-      $('#modelCount').textContent = number((data.models || []).length);
-      $('#userCount').textContent = number(data.users) + ' کاربر';
-      $('#providerBadge').textContent = boot.provider_configured ? 'کلید ثبت شده' : 'نیازمند تنظیم';
-      $('#providerBadge').classList.toggle('success', !!boot.provider_configured);
-      $('#providerStateText').textContent = boot.provider_configured ? 'کلید API رمزگذاری‌شده در سرور ثبت شده است.' : 'برای فعال‌سازی قابلیت‌های هوش مصنوعی، کلید را ثبت کنید.';
-      $('#providerMask').textContent = boot.provider_configured ? '••••••••••••••••' : 'پیکربندی نشده';
-      const models = data.models || [];
-      $('#modelUsage').innerHTML = models.length ? models.map(model => {
-        const total = Math.max(1, ...models.map(x => Number(x.requests || 0)));
-        const percent = Math.max(3, Math.round(Number(model.requests || 0) / total * 100));
-        return '<div class="usage-model-row"><div><b>' + escapeHtml(model.model || 'مدل نامشخص') + '</b><span>' + number(model.requests) + ' درخواست · ' + money(model.cost) + ' تومان</span></div><div class="usage-bar"><i class="usage-bar-fill usage-width-' + percent + '"></i></div></div>';
-      }).join('') : '<div class="empty-state compact-empty">هنوز درخواست ثبت نشده است.</div>';
-      $('#recentUsage').innerHTML = (data.recent || []).length ? data.recent.map(row => '<tr><td>' + escapeHtml(row.operation) + '</td><td dir="ltr">' + escapeHtml(row.model || '—') + '</td><td><span class="table-status ' + (Number(row.status_code) < 400 ? 'ok' : 'bad') + '">' + number(row.status_code) + '</span></td><td>' + number(row.total_tokens) + '</td><td>' + money(row.charged_toman) + '</td><td>' + escapeHtml(new Date(row.created_at).toLocaleString('fa-IR')) + '</td></tr>').join('') : '<tr><td colspan="6" class="empty-cell">هیچ درخواست هوش مصنوعی از این پنل ثبت نشده است.</td></tr>';
-    } catch (error) {
-      toast('خطا در دریافت داشبورد: ' + error.message, 'error');
+    if (!isDeveloperAdmin) {
+      try { const data=await api('/platform/overview');
+        $('#educationStudents').textContent=number(data.students); $('#educationActiveStudents').textContent=number(data.activeStudents);
+        $('#educationResources').textContent=number(data.resources); $('#educationQuestions').textContent=number(data.questions);
+        $('#educationExams').textContent=number(data.exams); $('#educationSubmitted').textContent=number(data.submitted);
+      } catch(error) { toast('خطا در دریافت داشبورد آموزشی: '+error.message,'error'); }
+      return;
     }
+    try {
+      const [data,boot]=await Promise.all([api('/dashboard'),api('/bootstrap')]); state.bootstrap=boot;
+      $('#todayCost').textContent=money(data.today?.cost); $('#todayRequests').textContent=number(data.today?.requests)+' درخواست';
+      $('#monthCost').textContent=money(data.month?.cost); $('#monthRequests').textContent=number(data.month?.requests)+' درخواست';
+      $('#monthTokens').textContent=number(data.month?.tokens); $('#allRequests').textContent=number(data.totals?.requests)+' درخواست کل';
+      $('#modelCount').textContent=number((data.models||[]).length); $('#userCount').textContent=number(data.users)+' کاربر';
+      $('#providerBadge').textContent=boot.provider_configured?'کلید ثبت شده':'نیازمند تنظیم'; $('#providerBadge').classList.toggle('success',!!boot.provider_configured);
+      $('#providerStateText').textContent=boot.provider_configured?'کلید API رمزگذاری‌شده در سرور ثبت شده است.':'برای فعال‌سازی قابلیت‌های هوش مصنوعی، کلید را ثبت کنید.';
+      $('#providerMask').textContent=boot.provider_configured?'••••••••••••••••':'پیکربندی نشده';
+      const models=data.models||[];
+      $('#modelUsage').innerHTML=models.length?models.map(model=>{const total=Math.max(1,...models.map(x=>Number(x.requests||0)));const percent=Math.max(3,Math.round(Number(model.requests||0)/total*100));return '<div class="usage-model-row"><div><b>'+escapeHtml(model.model||'مدل نامشخص')+'</b><span>'+number(model.requests)+' درخواست · '+money(model.cost)+' تومان</span></div><div class="usage-bar"><i class="usage-bar-fill usage-width-'+percent+'"></i></div></div>';}).join(''):'<div class="empty-state compact-empty">هنوز درخواست ثبت نشده است.</div>';
+      $('#recentUsage').innerHTML=(data.recent||[]).length?data.recent.map(row=>'<tr><td>'+escapeHtml(row.operation)+'</td><td dir="ltr">'+escapeHtml(row.model||'—')+'</td><td><span class="table-status '+(Number(row.status_code)<400?'ok':'bad')+'">'+number(row.status_code)+'</span></td><td>'+number(row.total_tokens)+'</td><td>'+money(row.charged_toman)+'</td><td>'+escapeHtml(new Date(row.created_at).toLocaleString('fa-IR'))+'</td></tr>').join(''):'<tr><td colspan="6" class="empty-cell">هیچ درخواست هوش مصنوعی از این پنل ثبت نشده است.</td></tr>';
+    } catch(error) { toast('خطا در دریافت داشبورد: '+error.message,'error'); }
   }
-
   function displayText(selector, text) {
     const node = $(selector);
     node.textContent = text || 'پاسخی از مدل دریافت نشد.';
   }
 
   function renderUsageDetails(selector, result) {
+    if (!isDeveloperAdmin) { const node = $(selector); if (node) node.textContent = ''; return; }
     const charged = result.paasta?.charged_toman;
     const usage = result.usage || {};
     const line = [
@@ -304,6 +301,7 @@
     attachGenerate('questionForm','question','#questionOutput','#questionMessage','#questionUsage','تولید سؤال');
     attachGenerate('practiceForm','practice','#practiceOutput','#practiceMessage','#practiceUsage','طراحی تمرین');
     attachGenerate('reviewForm','review','#reviewOutput','#reviewMessage','#reviewUsage','بررسی متن');
+    if (!isDeveloperAdmin) return;
 
     $('#saveQuestions').addEventListener('click', async () => {
       const text = $('#questionOutput').textContent.trim();
@@ -777,7 +775,8 @@
       $('#userCount').textContent=number(state.users.length)+' حساب';
       $('#userRows').innerHTML=state.users.length?state.users.map(row=>{
         const active=!!Number(row.active);
-        return '<tr><td>'+number(row.id)+'</td><td dir="ltr">'+escapeHtml(row.email)+'</td><td>'+escapeHtml(row.role)+'</td><td><span class="table-status '+(active?'ok':'bad')+'">'+(active?'فعال':'غیرفعال')+'</span></td><td>'+escapeHtml(new Date(row.created_at).toLocaleDateString('fa-IR'))+'</td><td><button class="button button-secondary" data-user-status="'+Number(row.id)+'" data-active="'+(active?'1':'0')+'">'+(active?'غیرفعال‌سازی':'فعال‌سازی')+'</button></td></tr>';
+        const roleLabel=({developer_admin:'ادمین برنامه‌نویس',education_admin:'ادمین آموزشی',admin:'ادمین برنامه‌نویس',user:'کاربر'})[row.role]||row.role;
+        return '<tr><td>'+number(row.id)+'</td><td dir="ltr">'+escapeHtml(row.email)+'</td><td>'+escapeHtml(roleLabel)+'</td><td><span class="table-status '+(active?'ok':'bad')+'">'+(active?'فعال':'غیرفعال')+'</span></td><td>'+escapeHtml(new Date(row.created_at).toLocaleDateString('fa-IR'))+'</td><td><button class="button button-secondary" data-user-status="'+Number(row.id)+'" data-active="'+(active?'1':'0')+'">'+(active?'غیرفعال‌سازی':'فعال‌سازی')+'</button></td></tr>';
       }).join(''):'<tr><td colspan="6" class="empty-cell">کاربری پیدا نشد.</td></tr>';
     } catch(error) {
       $('#userRows').innerHTML='<tr><td colspan="6" class="empty-cell">'+escapeHtml(error.message)+'</td></tr>';
@@ -1213,6 +1212,8 @@
         if(del){if(!confirm('منبع و فایل آن حذف شود؟'))return;await api('/platform/resources/'+Number(del.dataset.resourceDelete),{method:'DELETE',body:'{}'});await loadResources();}
       }catch(error){toast(error.message,'error');}
     });
+    }
+
     $('#bankQuestionRows').addEventListener('click',async event=>{
       const publish=event.target.closest('[data-question-publish]'), del=event.target.closest('[data-question-delete]');
       try{
@@ -1326,6 +1327,7 @@
   }
 
   function delegatedActions() {
+    if (isDeveloperAdmin) {
     $('#modelGrid').addEventListener('click',event=>{
       const button=event.target.closest('[data-select-model]');
       if(!button)return;
@@ -1366,6 +1368,7 @@
       }
     });
 
+    if (isDeveloperAdmin) {
     $('#promptSelect').addEventListener('change',()=>{
       showPrompt(state.prompts.find(row=>row.slug===$('#promptSelect').value));
     });
@@ -1386,19 +1389,24 @@
     });
 
     $('#historyList').addEventListener('click',async event=>{
-      const button=event.target.closest('[data-history-copy]');
-      if(!button)return;
-      const row=(state.history||[]).find(item=>Number(item.id)===Number(button.dataset.historyCopy));
-      if(!row)return;
-      try{await navigator.clipboard.writeText(row.output||'');toast('خروجی کپی شد.','success');}
-      catch{toast('کپی خروجی انجام نشد.','error');}
+      const button=event.target.closest('[data-history-copy]'); if(!button)return;
+      const row=(state.history||[]).find(item=>Number(item.id)===Number(button.dataset.historyCopy)); if(!row)return;
+      try{await navigator.clipboard.writeText(row.output||'');toast('خروجی کپی شد.','success');}catch{toast('کپی خروجی انجام نشد.','error');}
     });
+    const createAdminForm=$('#adminCreateForm');
+    if(createAdminForm) createAdminForm.addEventListener('submit',async event=>{
+      event.preventDefault(); const form=createAdminForm,data=payloadFromForm(form); setBusy(form,true,'در حال ایجاد حساب...');
+      try{const result=await api('/users',{method:'POST',body:json(data)});form.reset();setMessage('#adminCreateMessage',result.message||'حساب ساخته شد.','success');toast('حساب ادمین ساخته شد.','success');await loadUsers();}
+      catch(error){setMessage('#adminCreateMessage',error.message,'error');toast(error.message,'error');}finally{setBusy(form,false);}
+    });
+    }
   }
 
   function initNavigation() {
     $('#mobileMenu').addEventListener('click',()=>$('#sidebar').classList.toggle('open'));
     $('#globalRefresh').addEventListener('click',()=>showPage(state.currentPage));
     $('#refreshDashboard').addEventListener('click',loadDashboard);
+    if (!isDeveloperAdmin) return;
     $('#refreshModels').addEventListener('click',()=>loadCatalog($('#page-models .catalog-tab.active')?.dataset.catalog||'models',true));
     $('#modelSearch').addEventListener('input',()=>renderCatalog($('#page-models .catalog-tab.active')?.dataset.catalog||'models'));
     $('#loadUsage').addEventListener('click',loadUsage);
@@ -1412,7 +1420,7 @@
     bindPlatformTables();
     initPlatformNavigation();
     const label=new Date().toLocaleDateString('fa-IR',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
-    $('#todayLabel').textContent=label;
+    const todayLabel=$('#todayLabel'); if(todayLabel) todayLabel.textContent=label;
     initNavigation();
     activateTabs();
     delegatedActions();
@@ -1420,9 +1428,9 @@
     try {
       state.bootstrap=await api('/bootstrap');
       await loadDashboard();
-      if (state.bootstrap.provider_configured) {
+      if (isDeveloperAdmin && state.bootstrap.provider_configured) {
         await Promise.allSettled([loadCatalog('models'),loadCatalog('decisions'),loadCatalog('images'),loadCatalog('audio'),loadCatalog('speech'),loadCatalog('embeddings')]);
-      } else {
+      } else if (isDeveloperAdmin) {
         toast('برای فعال شدن ابزارهای هوش مصنوعی، ابتدا کلید سرویس را در تنظیمات ثبت کنید.','info');
       }
     } catch(error) {

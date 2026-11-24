@@ -1,0 +1,5 @@
+<section class="page-view" id="page-attempts">
+      <div class="page-heading"><div><div class="eyebrow">EXAM RESPONSES & GRADING</div><h1>پاسخ‌نامه‌ها و نمرات</h1><p>مشاهده پاسخ دانش‌آموز، زمان شروع و پایان، نمره و موارد نیازمند تصحیح دستی.</p></div><button class="button button-ghost" id="refreshAttempts">↻ به‌روزرسانی</button></div>
+      <section class="panel-card table-panel"><div class="table-scroll"><table><thead><tr><th>دانش‌آموز</th><th>آزمون</th><th>پاسخ داده‌شده</th><th>شروع</th><th>ارسال</th><th>نمره</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody id="attemptRows"><tr><td colspan="8" class="empty-cell">در حال دریافت...</td></tr></tbody></table></div></section>
+      <section class="panel-card" id="attemptDetailPanel" hidden><div class="panel-heading"><div><h3 id="attemptDetailTitle">جزئیات پاسخ‌نامه</h3><p id="attemptDetailMeta"></p></div><button class="button button-secondary" id="closeAttemptDetail" type="button">بستن</button></div><div id="attemptAnswers"></div></section>
+    </section>

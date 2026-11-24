@@ -10,6 +10,17 @@ $path = preg_replace('#^/api(?=/|$)#', '', $path) ?: '/';
 
 if ($method !== 'GET') app_check_csrf();
 
+if (!app_is_developer_admin($admin)) {
+    $educationAllowed =
+        ($method === 'GET' && $path === '/bootstrap') ||
+        ($method === 'POST' && in_array($path, ['/generate','/questions/save'], true)) ||
+        ($method === 'GET' && $path === '/questions') ||
+        ($method === 'DELETE' && preg_match('#^/questions/[1-9][0-9]*$#', $path)) ||
+        (str_starts_with($path, '/platform/') && $path !== '/platform/settings') ||
+        ($method === 'GET' && preg_match('#^/resources/[1-9][0-9]*/download$#', $path));
+    if (!$educationAllowed) app_json(403, ['error' => 'این قابلیت فقط برای ادمین برنامه‌نویس در دسترس است.']);
+}
+
 const PAASTA_AI_BASE = 'https://console.paasta.cloud/api/ai/v1';
 
 function ai_json_decode(string $raw): array
@@ -837,7 +848,9 @@ if ($method === 'POST' && $path === '/platform/questions/generate') {
     $trackId = !empty($body['track_id']) ? (int)$body['track_id'] : null;
     $level = platform_track_level(app_db(), $trackId) ?? '';
     $targetStudentId = !empty($body['target_student_id']) ? (int)$body['target_student_id'] : null;
-    if ($model === '' || $resourceId < 1) app_json(422, ['error' => 'مدل و فایل منبع آموزشی را انتخاب کنید.']);
+    if ($model === '') $model = (string)(app_db()->query('SELECT default_model FROM ai_provider_settings WHERE id=1')->fetchColumn() ?: '');
+    if ($model === '') app_json(422, ['error' => 'مدل پیش‌فرض هوش مصنوعی هنوز توسط ادمین برنامه‌نویس تنظیم نشده است.']);
+    if ($resourceId < 1) app_json(422, ['error' => 'فایل منبع آموزشی را انتخاب کنید.']);
     $sourceStmt = app_db()->prepare('SELECT id,title,content_text FROM learning_resources WHERE id=? LIMIT 1');
     $sourceStmt->execute([$resourceId]); $source = $sourceStmt->fetch();
     if (!$source || trim((string)$source['content_text']) === '') app_json(422, ['error' => 'منبع انتخابی متن قابل پردازش ندارد؛ برای تولید AI فایل TXT یا MD بارگذاری کنید.']);
@@ -1066,16 +1079,15 @@ if ($method === 'GET' && preg_match('#^/resources/([1-9][0-9]*)/download$#',$pat
 
 
 if ($method === 'GET' && $path === '/bootstrap') {
+    if (!app_is_developer_admin($admin)) app_json(200, ['admin' => ['id' => (int)$admin['id'], 'email' => $admin['email'], 'role' => 'education_admin'], 'csrf' => app_csrf()]);
     $stmt = app_db()->query('SELECT default_model,api_key_ciphertext,updated_at FROM ai_provider_settings WHERE id=1');
     $settings = $stmt->fetch() ?: [];
     app_json(200, [
-        'admin' => ['id' => (int)$admin['id'], 'email' => $admin['email']],
-        'csrf' => app_csrf(),
-        'api_base' => PAASTA_AI_BASE,
+        'admin' => ['id' => (int)$admin['id'], 'email' => $admin['email'], 'role' => (string)$admin['role']],
+        'csrf' => app_csrf(), 'api_base' => PAASTA_AI_BASE,
         'provider_configured' => !empty($settings['api_key_ciphertext']),
         'provider_mask' => !empty($settings['api_key_ciphertext']) ? '••••••••••••••••' : '',
-        'default_model' => $settings['default_model'] ?? '',
-        'provider_updated_at' => $settings['updated_at'] ?? null,
+        'default_model' => $settings['default_model'] ?? '', 'provider_updated_at' => $settings['updated_at'] ?? null,
     ]);
 }
 
@@ -1114,6 +1126,22 @@ if ($method === 'POST' && $path === '/prompts') {
     app_json(200,['ok'=>true,'message'=>'قالب دستور با موفقیت ذخیره شد.']);
 }
 
+if ($method === 'POST' && $path === '/users') {
+    $body = app_request_json();
+    $email = strtolower(trim((string)($body['email'] ?? '')));
+    $password = (string)($body['password'] ?? '');
+    $role = (string)($body['role'] ?? 'education_admin');
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 190) app_json(422, ['error' => 'ایمیل مدیر معتبر نیست.']);
+    if (strlen($password) < 14 || strlen($password) > 4096) app_json(422, ['error' => 'رمز عبور باید حداقل ۱۴ کاراکتر داشته باشد.']);
+    if (!in_array($role, ['developer_admin','education_admin'], true)) app_json(422, ['error' => 'نوع ادمین معتبر نیست.']);
+    $pdo = app_db(); $exists = $pdo->prepare('SELECT id FROM users WHERE email=? LIMIT 1'); $exists->execute([$email]);
+    if ($exists->fetchColumn()) app_json(409, ['error' => 'حسابی با این ایمیل از قبل وجود دارد.']);
+    $insert = $pdo->prepare('INSERT INTO users (email,password_hash,role,active) VALUES (?,?,?,1)');
+    $insert->execute([$email,password_hash($password,PASSWORD_DEFAULT),$role]); $id=(int)$pdo->lastInsertId();
+    $audit=$pdo->prepare('INSERT INTO admin_audit_log (admin_user_id,action,target_type,target_id,ip_address) VALUES (?,?,?,?,?)');
+    $audit->execute([(int)$admin['id'],'admin.create','user',$id,substr((string)($_SERVER['REMOTE_ADDR']??'unknown'),0,45)]);
+    app_json(201,['ok'=>true,'id'=>$id,'role'=>$role,'message'=>'حساب ادمین با موفقیت ساخته شد.']);
+}
 if ($method === 'GET' && $path === '/users') {
     $q=trim((string)($_GET['q']??''));
     $limit=min(200,max(1,(int)($_GET['limit']??100)));
@@ -1309,7 +1337,8 @@ if ($method === 'POST' && $path === '/generate') {
     if (!empty($body['save_history'])) {
         ai_save_history($admin,$type,($type==='question'?'تولید سؤال':($type==='practice'?'طراحی تمرین':'بررسی متن')),$model,$prompt,$output,(string)$requestId);
     }
-    app_json(200,['output'=>$output,'usage'=>$call['data']['usage']??null,'paasta'=>$call['data']['paasta']??null,'request_id'=>$requestId]);
+    if (app_is_developer_admin($admin)) app_json(200,['output'=>$output,'usage'=>$call['data']['usage']??null,'paasta'=>$call['data']['paasta']??null,'request_id'=>$requestId]);
+    app_json(200,['output'=>$output]);
 }
 
 if ($method === 'POST' && $path === '/ai/chat/stream') {

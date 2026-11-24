@@ -57,7 +57,7 @@ if (!hash_equals($password, $confirmation)) {
 }
 
 $hash = password_hash($password, PASSWORD_DEFAULT);
-$insert = $pdo->prepare("INSERT INTO users (email, password_hash, role, active) VALUES (?, ?, 'admin', 1)");
+$insert = $pdo->prepare("INSERT INTO users (email, password_hash, role, active) VALUES (?, ?, 'developer_admin', 1)");
 $insert->execute([$email, $hash]);
 unset($password, $confirmation, $hash);
 echo "Administrator account created successfully.\n";

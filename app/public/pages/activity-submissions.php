@@ -1,0 +1,5 @@
+<section class="page-view" id="page-activity-submissions">
+      <div class="page-heading"><div><div class="eyebrow">PRACTICE REVIEW</div><h1>پاسخ تمرین‌ها و تکالیف</h1><p>مشاهده پاسخ‌ها، نمرات و بررسی موارد تشریحی.</p></div><button class="button button-ghost" id="refreshActivitySubmissions">↻ به‌روزرسانی</button></div>
+      <section class="panel-card table-panel"><div class="table-scroll"><table><thead><tr><th>دانش‌آموز</th><th>تمرین</th><th>تعداد پاسخ</th><th>زمان ارسال</th><th>نمره</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody id="activitySubmissionRows"><tr><td colspan="7" class="empty-cell">در حال دریافت...</td></tr></tbody></table></div></section>
+      <section class="panel-card" id="activitySubmissionDetailPanel" hidden><div class="panel-heading"><div><h3 id="activitySubmissionDetailTitle">جزئیات پاسخ تمرین</h3><p id="activitySubmissionDetailMeta"></p></div><button class="button button-secondary" id="closeActivitySubmissionDetail" type="button">بستن</button></div><div id="activitySubmissionAnswers"></div></section>
+    </section>

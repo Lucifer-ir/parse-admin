@@ -1,0 +1,5 @@
+<section class="page-view" id="page-models">
+      <div class="page-heading"><div><div class="eyebrow">MODEL REGISTRY</div><h1>کاتالوگ مدل‌ها</h1><p>دریافت مدل‌ها و قابلیت‌ها مستقیماً از API پاستا.</p></div><button class="button button-ghost" id="refreshModels">↻ دریافت کاتالوگ</button></div>
+      <div class="catalog-tabs"><button class="catalog-tab active" data-catalog="models">مدل‌های متنی</button><button class="catalog-tab" data-catalog="decisions">تصمیم‌گیری</button><button class="catalog-tab" data-catalog="images">تصویر</button><button class="catalog-tab" data-catalog="audio">مدل‌های صوت</button><button class="catalog-tab" data-catalog="speech">صداها و Voice</button><button class="catalog-tab" data-catalog="embeddings">Embedding</button></div>
+      <div class="filter-row"><input id="modelSearch" class="input" placeholder="جست‌وجوی مدل یا شناسه..."><span id="modelCountLabel" class="muted-label"></span></div><div id="modelGrid" class="model-grid"><div class="empty-state">برای دریافت کاتالوگ، اتصال API را در تنظیمات ثبت کنید.</div></div>
+    </section>

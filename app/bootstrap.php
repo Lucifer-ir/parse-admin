@@ -110,7 +110,7 @@ function app_admin(): ?array
     $stmt = app_db()->prepare("SELECT id,email,role,active FROM users WHERE id=? LIMIT 1");
     $stmt->execute([(int)$_SESSION['admin_id']]);
     $user = $stmt->fetch();
-    if (!$user || $user['role'] !== 'admin' || !(bool)$user['active']) {
+    if (!$user || !in_array((string)$user['role'], ['admin','developer_admin','education_admin'], true) || !(bool)$user['active']) {
         unset($_SESSION['admin_id']);
         return null;
     }
@@ -121,6 +121,18 @@ function app_require_admin(): array
 {
     $admin = app_admin();
     if (!$admin) app_json(401, ['error' => 'برای دسترسی به این بخش دوباره وارد شوید.']);
+    return $admin;
+}
+
+function app_is_developer_admin(?array $admin): bool
+{
+    return $admin !== null && in_array((string)($admin['role'] ?? ''), ['admin','developer_admin'], true);
+}
+
+function app_require_developer_admin(): array
+{
+    $admin = app_require_admin();
+    if (!app_is_developer_admin($admin)) app_json(403, ['error' => 'این بخش فقط برای ادمین برنامه‌نویس در دسترس است.']);
     return $admin;
 }
 

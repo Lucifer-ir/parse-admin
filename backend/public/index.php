@@ -87,7 +87,7 @@ function require_admin(PDO $pdo): array
     $stmt->execute([$tokenHash]);
     $admin = $stmt->fetch();
 
-    if (!$admin || !(bool)$admin['active'] || $admin['role'] !== 'admin') {
+    if (!$admin || !(bool)$admin['active'] || !in_array((string)$admin['role'], ['admin','developer_admin','education_admin'], true)) {
         respond(401, ['detail' => 'Invalid or expired admin session.']);
     }
 
@@ -149,7 +149,7 @@ if ($method === 'POST' && $path === '/auth/login') {
     $stmt->execute([$email]);
     $user = $stmt->fetch();
     $validPassword = $user && password_verify($password, (string)$user['password_hash']);
-    $isAdmin = $validPassword && (bool)$user['active'] && $user['role'] === 'admin';
+    $isAdmin = $validPassword && (bool)$user['active'] && in_array((string)$user['role'], ['admin','developer_admin','education_admin'], true);
 
     $attempt = $pdo->prepare('INSERT INTO login_attempts (ip_address, email, success) VALUES (?, ?, ?)');
     $attempt->execute([$ip, $email, $isAdmin ? 1 : 0]);
@@ -207,6 +207,9 @@ if ($method === 'GET' && $path === '/auth/me') {
 
 if (str_starts_with($path, '/admin/')) {
     $admin = require_admin($pdo);
+    if (in_array($path, ['/admin/stats','/admin/users'], true) && !in_array((string)$admin['role'], ['admin','developer_admin'], true)) {
+        respond(403, ['detail' => 'Developer administrator access required.']);
+    }
 
     if ($method === 'GET' && $path === '/admin/stats') {
         $users = (int)$pdo->query('SELECT COUNT(*) FROM users')->fetchColumn();
