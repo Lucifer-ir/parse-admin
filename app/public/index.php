@@ -87,7 +87,7 @@ header('Pragma: no-cache');
 header('X-Content-Type-Options: nosniff');
 header('Referrer-Policy: strict-origin-when-cross-origin');
 header('X-Frame-Options: DENY');
-header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' https://cdnjs.cloudflare.com; font-src 'self' https://cdnjs.cloudflare.com data:; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");
+header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' https://cdnjs.cloudflare.com; style-src-attr 'unsafe-inline'; font-src 'self' https://cdnjs.cloudflare.com data:; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");
 $csrf=app_csrf();
 $assetVersion = max(
     (int)(@filemtime(__DIR__ . '/assets/admin.css') ?: 0),
@@ -103,10 +103,10 @@ $assetVersion = max(
 <meta name="admin-role" content="<?= $isDeveloperAdmin ? 'developer_admin' : 'education_admin' ?>">
 <title><?= $admin ? 'کنسول مدیریت Parse' : 'ورود مدیر | Parse Admin' ?></title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"><link rel="stylesheet" href="/assets/admin.css?v=<?= app_e((string)$assetVersion) ?>">
-<?php if (is_file(__DIR__ . '/assets/fonts/custom-font.css')): ?><link rel="stylesheet" href="/assets/fonts/custom-font.css?v=<?= (int)filemtime(__DIR__ . '/assets/fonts/custom-font.css') ?>"><?php endif; ?>
+
 </head>
-<body class="<?= $admin ? 'app-page' : 'login-page' ?>
-<div id="parseStartup"><div class="mark">P</div><div class="spin"></div><p>در حال آماده‌سازی Parse Admin</p></div>">
+<body class="<?= $admin ? 'app-page' : 'login-page' ?>">
+<div id="parseStartup"><div class="mark">P</div><div class="spin"></div><p>در حال آماده‌سازی Parse Admin</p></div>
 <?php if (!$admin): ?>
 <div class="login-shell">
   <div class="login-decoration decor-one"></div><div class="login-decoration decor-two"></div>
