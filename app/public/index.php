@@ -102,7 +102,7 @@ $assetVersion = max(
 <meta name="csrf-token" content="<?= app_e($csrf) ?>">
 <meta name="admin-role" content="<?= $isDeveloperAdmin ? 'developer_admin' : 'education_admin' ?>">
 <title><?= $admin ? 'کنسول مدیریت Parse' : 'ورود مدیر | Parse Admin' ?></title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"><link rel="stylesheet" href="/assets/admin.css?v=<?= app_e((string)$assetVersion) ?>">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.3.1/css/all.min.css"><link rel="stylesheet" href="/assets/admin.css?v=<?= app_e((string)$assetVersion) ?>">
 
 </head>
 <body class="<?= $admin ? 'app-page' : 'login-page' ?>">
@@ -111,18 +111,18 @@ $assetVersion = max(
 <div class="login-shell">
   <div class="login-decoration decor-one"></div><div class="login-decoration decor-two"></div>
   <section class="login-card">
-    <div class="login-brand"><div class="brand-symbol">P<span></span></div><div><strong>PARSE<span>ADMIN</span></strong><small>AI PLATFORM CONTROL CENTER</small></div></div>
+    <div class="login-brand"><img class="login-logo" src="/assets/Parseh_Language_Academy.png" alt="Parseh Language Academy"></div>
     <div class="login-overline"><i></i> SECURE ADMINISTRATOR ACCESS</div>
     <h1>به مرکز مدیریت<br><span>Parse خوش آمدید</span></h1>
     <p class="login-description">مدیریت هوشمند کاربران، محتوای آموزشی، مدل‌های هوش مصنوعی و هزینه‌های پلتفرم در یک فضای یکپارچه.</p>
     <?php if ($loginError !== ''): ?><div class="login-alert" role="alert"><?= app_e($loginError) ?></div><?php endif; ?>
     <form method="post" action="/" class="login-form" autocomplete="on">
       <input type="hidden" name="action" value="login"><input type="hidden" name="_csrf" value="<?= app_e($csrf) ?>">
-      <label for="email">ایمیل مدیر</label><div class="field-wrap"><span class="field-icon">✉</span><input id="email" name="email" type="email" autocomplete="username" placeholder="admin@yourdomain.com" required autofocus value="<?= app_e($_POST['email'] ?? '') ?>"></div>
-      <label for="password">رمز عبور</label><div class="field-wrap"><span class="field-icon">⌑</span><input id="password" name="password" type="password" autocomplete="current-password" placeholder="رمز عبور حساب مدیر" required></div>
-      <button class="login-submit" type="submit"><span>ورود امن به پنل</span><b>←</b></button>
+      <label for="email">ایمیل مدیر</label><div class="field-wrap"><i class="field-icon fa-solid fa-envelope" aria-hidden="true"></i><input id="email" name="email" type="email" autocomplete="username" placeholder="admin@yourdomain.com" required autofocus value="<?= app_e($_POST['email'] ?? '') ?>"></div>
+      <label for="password">رمز عبور</label><div class="field-wrap"><i class="field-icon fa-solid fa-lock" aria-hidden="true"></i><input id="password" name="password" type="password" autocomplete="current-password" placeholder="رمز عبور حساب مدیر" required></div>
+      <button class="login-submit" type="submit"><span>ورود امن به پنل</span><i class="fa-solid fa-arrow-left" aria-hidden="true"></i></button>
     </form>
-    <div class="login-foot"><span class="shield">◆</span> ارتباط امن با نشست سمت سرور · محافظت‌شده با HTTPS</div>
+    <div class="login-foot"><i class="shield fa-solid fa-shield-halved" aria-hidden="true"></i> ارتباط امن با نشست سمت سرور · محافظت‌شده با HTTPS</div>
   </section>
   <aside class="login-side">
     <div class="orb orb-a"></div><div class="orb orb-b"></div>
