@@ -209,7 +209,7 @@ $assetVersion = max(
     <?php if (!empty($pageAccess['prompts'])) { $pageLocal = __DIR__ . '/pages/prompts.local.php'; $pageDefault = __DIR__ . '/pages/prompts.php'; require is_file($pageLocal) ? $pageLocal : $pageDefault; } ?>
 
     <?php if (!empty($pageAccess['settings'])) { $pageLocal = __DIR__ . '/pages/settings.local.php'; $pageDefault = __DIR__ . '/pages/settings.php'; require is_file($pageLocal) ? $pageLocal : $pageDefault; } ?>
-    <nav id="mobileQuickDock" class="mobile-quick-dock" aria-label="دسترسی سریع"><button type="button" data-quick-page="dashboard"><i class="fa fa-home"></i><span>خانه</span></button><button type="button" data-quick-page="question-bank"><i class="fa fa-book"></i><span>بانک سؤال</span></button><button type="button" data-quick-page="students"><i class="fa fa-users"></i><span>دانش‌آموز</span></button><button type="button" id="themeToggle"><i class="fa fa-moon-o"></i><span>تم</span></button><button type="button" id="quickMenu"><i class="fa fa-bars"></i><span>منو</span></button></nav><footer class="app-footer"><span>PARSE ADMIN</span><span>Secure server-side console · <?= date('Y') ?></span></footer>
+    <footer class="app-footer"><span>PARSE ADMIN</span><span>Secure server-side console · <?= date('Y') ?></span></footer>
   </main>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
