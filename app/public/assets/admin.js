@@ -77,7 +77,50 @@
 
   function json(data) { return JSON.stringify(data); }
 
-  function bindMobileDock(){const dock=$('#mobileQuickDock');if(dock&&!dock.dataset.bound){dock.dataset.bound='1';dock.addEventListener('click',e=>{const p=e.target.closest('[data-quick-page]');if(p)showPage(p.dataset.quickPage);});}const t=$('#themeToggle');if(t&&!t.dataset.bound){t.dataset.bound='1';t.addEventListener('click',()=>{const light=document.body.classList.toggle('light-theme');try{localStorage.setItem('parse-theme',light?'light':'dark')}catch{};t.innerHTML=light?'<i class="fa fa-sun-o"></i><span>تم</span>':'<i class="fa fa-moon-o"></i><span>تم</span>';});}const m=$('#quickMenu');if(m&&!m.dataset.bound){m.dataset.bound='1';m.addEventListener('click',()=>$('#mobileMenu')?.click());}if(!document.body.dataset.themeInit){document.body.dataset.themeInit='1';try{if(localStorage.getItem('parse-theme')==='light')document.body.classList.add('light-theme')}catch{}}}
+  function applyTheme(light) {
+    document.body.classList.toggle('light-theme', light);
+    try { localStorage.setItem('parse-theme', light ? 'light' : 'dark'); } catch {}
+    ['#themeToggle','[data-theme-toggle]'].forEach(selector => {
+      $$(selector).forEach(button => {
+        button.innerHTML = light
+          ? '<i class="fa fa-sun-o" aria-hidden="true"></i><span>تم</span>'
+          : '<i class="fa fa-moon-o" aria-hidden="true"></i><span>تم</span>';
+      });
+    });
+  }
+
+  function bindMobileDock() {
+    const dock = $('#mobileQuickDock');
+    if (dock && !dock.dataset.bound) {
+      dock.dataset.bound = '1';
+      dock.addEventListener('click', event => {
+        const pageButton = event.target.closest('[data-quick-page]');
+        if (pageButton) showPage(pageButton.dataset.quickPage);
+      });
+    }
+    $$('#themeToggle,[data-theme-toggle]').forEach(button => {
+      if (button.dataset.bound) return;
+      button.dataset.bound = '1';
+      button.addEventListener('click', event => {
+        event.preventDefault();
+        applyTheme(!document.body.classList.contains('light-theme'));
+      });
+    });
+    const quickMenu = $('#quickMenu');
+    if (quickMenu && !quickMenu.dataset.bound) {
+      quickMenu.dataset.bound = '1';
+      quickMenu.addEventListener('click', event => {
+        event.preventDefault();
+        const menuButton = $('#mobileMenu');
+        if (menuButton) menuButton.click();
+      });
+    }
+    if (!document.body.dataset.themeInit) {
+      document.body.dataset.themeInit = '1';
+      try { applyTheme(localStorage.getItem('parse-theme') === 'light'); }
+      catch { applyTheme(false); }
+    }
+  }
 
   function showPage(page, label, updateUrl = true) { if(updateUrl){const url=new URL(location.href);url.searchParams.set('page',page);history.pushState({page},'',url);}
     const titles = {
@@ -96,7 +139,7 @@
     if (page === 'models') loadCatalog('models');
     if (page === 'usage') loadUsage();
     if (page === 'history') loadHistory();
-    if (page === 'settings') { loadSettings(); loadPlatformSettings(); }
+    if (page === 'settings') { loadSettings(); loadPlatformSettings(); loadModelTestCatalogs(); }
     if (page === 'users') loadUsers();
     if (page === 'prompts') loadPrompts();
     if (page === 'students') { loadStudents(); loadTracks(); }
@@ -723,6 +766,64 @@
       try{const result=await api('/settings/test',{method:'POST',body:'{}'});setMessage('#settingsMessage',result.message+' تعداد مدل‌ها: '+number(result.models_count),'success');}
       catch(error){setMessage('#settingsMessage',error.message,'error');}
     });
+  }
+
+  async function loadModelTestCatalogs() {
+    try {
+      const [textCatalog, speechCatalog] = await Promise.all([api('/catalog/models'), api('/catalog/speech')]);
+      const textModels = responseModels(textCatalog);
+      const speechModels = responseModels(speechCatalog);
+      const textSelect = $('#textTestModel');
+      const speechSelect = $('#speechTestModel');
+      if (textSelect) textSelect.innerHTML = modelOptionHtml(textModels);
+      if (speechSelect) speechSelect.innerHTML = modelOptionHtml(speechModels);
+      if (speechSelect && !speechModels.length) {
+        speechSelect.innerHTML = '<option value="">کاتالوگ صوتی خالی است</option>';
+      }
+    } catch (error) {
+      setMessage('#textTestMessage', error.message, 'error');
+      setMessage('#speechTestMessage', error.message, 'error');
+    }
+  }
+
+  function bindModelTestForms() {
+    const textForm = $('#textModelTestForm');
+    if (textForm && !textForm.dataset.bound) {
+      textForm.dataset.bound = '1';
+      textForm.addEventListener('submit', async event => {
+        event.preventDefault();
+        const data = payloadFromForm(textForm);
+        setBusy(textForm, true, 'در حال آزمایش...');
+        try {
+          const result = await api('/ai/chat', {method:'POST', body:json({model:data.model,message:data.input,max_tokens:256})});
+          displayText('#textTestOutput', result.output || formatObject(result.data));
+          setMessage('#textTestMessage', 'تولید متن موفق بود.', 'success');
+        } catch (error) { setMessage('#textTestMessage', error.message, 'error'); }
+        finally { setBusy(textForm, false); }
+      });
+    }
+    const speechForm = $('#speechModelTestForm');
+    if (speechForm && !speechForm.dataset.bound) {
+      speechForm.dataset.bound = '1';
+      speechForm.addEventListener('submit', async event => {
+        event.preventDefault();
+        const data = payloadFromForm(speechForm);
+        setBusy(speechForm, true, 'در حال تولید صوت...');
+        const output = $('#speechTestOutput');
+        if (output) output.innerHTML = '';
+        try {
+          const result = await api('/ai/speech', {method:'POST', body:json(data)});
+          const bytes = Uint8Array.from(atob(result.audio_base64), character => character.charCodeAt(0));
+          const blob = new Blob([bytes], {type:result.content_type || 'audio/mpeg'});
+          const url = URL.createObjectURL(blob);
+          const player = document.createElement('audio');
+          player.controls = true; player.src = url;
+          output.append(player);
+          setMessage('#speechTestMessage', 'تولید گفتار موفق بود.', 'success');
+        } catch (error) { setMessage('#speechTestMessage', error.message, 'error'); }
+        finally { setBusy(speechForm, false); }
+      });
+    }
   }
 
   async function loadModelRouting(boot){try{const [data,catalog]=await Promise.all([api('/model-routing'),api('/catalog/models')]);const models=catalog.models||catalog.rows||catalog.data||[];const opts='<option value="">مدل پیش‌فرض</option>'+models.map(m=>'<option value="'+escapeHtml(m.id||m.name)+'">'+escapeHtml(m.id||m.name)+'</option>').join('');const current=Object.fromEntries((data.rows||[]).map(r=>[r.operation_key,r.model_id]));$('.route-model').forEach(s=>{s.innerHTML=opts;s.value=current[s.name]||'';});}catch(e){setMessage('#modelRoutingMessage',e.message,'error');}}
@@ -1439,7 +1540,7 @@
     const initial=new URL(location.href).searchParams.get('page');if(initial&&$('#page-'+initial))showPage(initial,undefined,false);
     window.addEventListener('popstate',()=>{const p=new URL(location.href).searchParams.get('page')||'dashboard';if($('#page-'+p))showPage(p,undefined,false);});
 
-    bindPlatformForms();
+    bindPlatformForms();\n    bindModelTestForms();
     bindPlatformTables();
     initPlatformNavigation();
     const label=new Date().toLocaleDateString('fa-IR',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
