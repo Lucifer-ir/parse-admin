@@ -102,7 +102,7 @@ $assetVersion = max(
 <meta name="csrf-token" content="<?= app_e($csrf) ?>">
 <meta name="admin-role" content="<?= $isDeveloperAdmin ? 'developer_admin' : 'education_admin' ?>">
 <title><?= $admin ? 'کنسول مدیریت Parse' : 'ورود مدیر | Parse Admin' ?></title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css"><link rel="stylesheet" href="/assets/admin.css?v=<?= app_e((string)$assetVersion) ?>">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"><link rel="stylesheet" href="/assets/admin.css?v=<?= app_e((string)$assetVersion) ?>">
 
 </head>
 <body class="<?= $admin ? 'app-page' : 'login-page' ?>">
