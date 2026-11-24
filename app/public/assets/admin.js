@@ -77,7 +77,9 @@
 
   function json(data) { return JSON.stringify(data); }
 
-  function bindMobileDock(){const dock=$('#mobileQuickDock');if(dock&&!dock.dataset.bound){dock.dataset.bound='1';dock.addEventListener('click',e=>{const p=e.target.closest('[data-quick-page]');if(p)showPage(p.dataset.quickPage);});}const t=$('#themeToggle');if(t&&!t.dataset.bound){t.dataset.bound='1';t.addEventListener('click',()=>{const light=document.body.classList.toggle('light-theme');try{localStorage.setItem('parse-theme',light?'light':'dark')}catch{};t.innerHTML=light?'<i class="fa fa-sun-o"></i><span>تم</span>':'<i class="fa fa-moon-o"></i><span>تم</span>';});}const m=$('#quickMenu');if(m&&!m.dataset.bound){m.dataset.bound='1';m.addEventListener('click',()=>$('#mobileMenu')?.click());}if(!document.body.dataset.themeInit){document.body.dataset.themeInit='1';try{if(localStorage.getItem('parse-theme')==='light')document.body.classList.add('light-theme')}catch{}}}\n\n  function showPage(page, label, updateUrl = true) { if(updateUrl){const url=new URL(location.href);url.searchParams.set('page',page);history.pushState({page},'',url);}
+  function bindMobileDock(){const dock=$('#mobileQuickDock');if(dock&&!dock.dataset.bound){dock.dataset.bound='1';dock.addEventListener('click',e=>{const p=e.target.closest('[data-quick-page]');if(p)showPage(p.dataset.quickPage);});}const t=$('#themeToggle');if(t&&!t.dataset.bound){t.dataset.bound='1';t.addEventListener('click',()=>{const light=document.body.classList.toggle('light-theme');try{localStorage.setItem('parse-theme',light?'light':'dark')}catch{};t.innerHTML=light?'<i class="fa fa-sun-o"></i><span>تم</span>':'<i class="fa fa-moon-o"></i><span>تم</span>';});}const m=$('#quickMenu');if(m&&!m.dataset.bound){m.dataset.bound='1';m.addEventListener('click',()=>$('#mobileMenu')?.click());}if(!document.body.dataset.themeInit){document.body.dataset.themeInit='1';try{if(localStorage.getItem('parse-theme')==='light')document.body.classList.add('light-theme')}catch{}}}
+
+  function showPage(page, label, updateUrl = true) { if(updateUrl){const url=new URL(location.href);url.searchParams.set('page',page);history.pushState({page},'',url);}
     const titles = {
       dashboard:'داشبورد', models:'کاتالوگ مدل‌ها', questions:'تولید سؤال', practice:'طراحی تمرین',
       review:'بررسی و ویرایش متن', playground:'AI Playground', multimodal:'تصویر و صوت',
@@ -732,13 +734,16 @@
       $('#providerBadge').textContent = settings.configured ? 'کلید ثبت شده' : 'نیازمند تنظیم';
       $('#providerStateText').textContent = settings.configured ? 'اتصال پاستا آماده تست است.' : 'کلید API هنوز ثبت نشده است.';
       $('#providerMask').textContent = settings.configured ? settings.masked_key : 'پیکربندی نشده';
-      $('#settingsForm [name="default_model"]').value = settings.default_model || '';\n      await loadModelRouting(boot);
+      $('#settingsForm [name="default_model"]').value = settings.default_model || '';
+      await loadModelRouting(boot);
     } catch(error) {
       setMessage('#settingsMessage',error.message,'error');
     }
   }
 
-  const routingForm=$('#modelRoutingForm');if(routingForm&&!routingForm.dataset.bound){routingForm.dataset.bound='1';routingForm.addEventListener('submit',async e=>{e.preventDefault();const routes={};$('.route-model',routingForm).forEach(s=>routes[s.name]=s.value);setBusy(routingForm,true,'در حال ذخیره...');try{const r=await api('/model-routing',{method:'POST',body:json({routes})});setMessage('#modelRoutingMessage',r.message,'success');}catch(err){setMessage('#modelRoutingMessage',err.message,'error');}finally{setBusy(routingForm,false);}});}\n\n  function localDateInput(date) {
+  const routingForm=$('#modelRoutingForm');if(routingForm&&!routingForm.dataset.bound){routingForm.dataset.bound='1';routingForm.addEventListener('submit',async e=>{e.preventDefault();const routes={};$('.route-model',routingForm).forEach(s=>routes[s.name]=s.value);setBusy(routingForm,true,'در حال ذخیره...');try{const r=await api('/model-routing',{method:'POST',body:json({routes})});setMessage('#modelRoutingMessage',r.message,'success');}catch(err){setMessage('#modelRoutingMessage',err.message,'error');}finally{setBusy(routingForm,false);}});}
+
+  function localDateInput(date) {
     const y=date.getFullYear();
     const m=String(date.getMonth()+1).padStart(2,'0');
     const d=String(date.getDate()).padStart(2,'0');
@@ -1423,7 +1428,8 @@
     $('#globalRefresh')?.addEventListener('click',()=>showPage(state.currentPage));$('#refreshDashboard')?.addEventListener('click',loadDashboard);if(!isDeveloperAdmin)return;$('#refreshModels')?.addEventListener('click',()=>loadCatalog($('#page-models .catalog-tab.active')?.dataset.catalog||'models',true));$('#modelSearch')?.addEventListener('input',()=>renderCatalog($('#page-models .catalog-tab.active')?.dataset.catalog||'models'));$('#loadUsage')?.addEventListener('click',loadUsage);$('#refreshHistory')?.addEventListener('click',loadHistory);$('#refreshUsers')?.addEventListener('click',loadUsers);$('#userSearch')?.addEventListener('input',()=>loadUsers());
   }
 
-  async function init() {\n    bindMobileDock();
+  async function init() {
+    bindMobileDock();
     const iconMap={dashboard:'fa-dashboard',models:'fa-cubes',questions:'fa-magic',practice:'fa-list',review:'fa-edit',playground:'fa-terminal',multimodal:'fa-picture-o',structured:'fa-code',batches:'fa-tasks',usage:'fa-line-chart',history:'fa-history','question-bank':'fa-database',users:'fa-users',students:'fa-graduation-cap',resources:'fa-book',exams:'fa-file-text',attempts:'fa-check-square-o',monitoring:'fa-area-chart',tracks:'fa-road',activities:'fa-list', 'activity-submissions':'fa-inbox',prompts:'fa-comment',settings:'fa-cog'};
     $$('.nav-item').forEach(n=>{const ic=$('i',n);if(ic){ic.className='fa '+(iconMap[n.dataset.page]||'fa-circle');ic.textContent='';}});
     const splash=$('#parseStartup');if(splash){const mark=$('.mark',splash);if(mark){mark.innerHTML='<img src="/assets/Parseh_Language_Academy.png" alt="Parseh Language Academy">';}let dots=$('.dots',splash);if(!dots){dots=document.createElement('div');dots.className='dots';dots.innerHTML='<span></span><span></span><span></span>';splash.appendChild(dots);}setTimeout(()=>{splash.classList.add('done');splash.style.opacity='0';splash.style.visibility='hidden';splash.style.pointerEvents='none';setTimeout(()=>splash.remove(),450);},2000);}
