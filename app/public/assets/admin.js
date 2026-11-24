@@ -723,7 +723,7 @@
     });
   }
 
-  async function loadSettings() {
+  async function loadModelRouting(boot){try{const [data,catalog]=await Promise.all([api('/model-routing'),api('/catalog/models')]);const models=catalog.models||catalog.rows||catalog.data||[];const opts='<option value="">مدل پیش‌فرض</option>'+models.map(m=>'<option value="'+escapeHtml(m.id||m.name)+'">'+escapeHtml(m.id||m.name)+'</option>').join('');const current=Object.fromEntries((data.rows||[]).map(r=>[r.operation_key,r.model_id]));$('.route-model').forEach(s=>{s.innerHTML=opts;s.value=current[s.name]||'';});}catch(e){setMessage('#modelRoutingMessage',e.message,'error');}}\n\n  async function loadSettings() {
     try {
       const [settings, boot] = await Promise.all([api('/settings'),api('/bootstrap')]);
       state.bootstrap = boot;
@@ -732,13 +732,13 @@
       $('#providerBadge').textContent = settings.configured ? 'کلید ثبت شده' : 'نیازمند تنظیم';
       $('#providerStateText').textContent = settings.configured ? 'اتصال پاستا آماده تست است.' : 'کلید API هنوز ثبت نشده است.';
       $('#providerMask').textContent = settings.configured ? settings.masked_key : 'پیکربندی نشده';
-      $('#settingsForm [name="default_model"]').value = settings.default_model || '';
+      $('#settingsForm [name="default_model"]').value = settings.default_model || '';\n      await loadModelRouting(boot);
     } catch(error) {
       setMessage('#settingsMessage',error.message,'error');
     }
   }
 
-  function localDateInput(date) {
+  const routingForm=$('#modelRoutingForm');if(routingForm&&!routingForm.dataset.bound){routingForm.dataset.bound='1';routingForm.addEventListener('submit',async e=>{e.preventDefault();const routes={};$('.route-model',routingForm).forEach(s=>routes[s.name]=s.value);setBusy(routingForm,true,'در حال ذخیره...');try{const r=await api('/model-routing',{method:'POST',body:json({routes})});setMessage('#modelRoutingMessage',r.message,'success');}catch(err){setMessage('#modelRoutingMessage',err.message,'error');}finally{setBusy(routingForm,false);}});}\n\n  function localDateInput(date) {
     const y=date.getFullYear();
     const m=String(date.getMonth()+1).padStart(2,'0');
     const d=String(date.getDate()).padStart(2,'0');
