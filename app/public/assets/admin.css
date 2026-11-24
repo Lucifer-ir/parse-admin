@@ -690,14 +690,7 @@ html,body{background:#f5f7fa!important;color:#182230!important}body{background:#
 @media(max-width:1100px){.main-area{margin-right:0;padding:0 18px 24px}.sidebar{transform:translateX(100%);transition:transform .2s}.sidebar.open{transform:translateX(0)}.mobile-menu{display:inline-grid;place-items:center}}
 /* Keep navigation focused on the Parse learning application */
 [data-page="models"],#page-models{display:none!important}
-[data-page="playground"],#page-playground{display:none!important}
-[data-page="multimodal"],#page-multimodal{display:none!important}
-[data-page="structured"],#page-structured{display:none!important}
-[data-page="batches"],#page-batches{display:none!important}
-[data-page="usage"],#page-usage{display:none!important}
-[data-page="history"],#page-history{display:none!important}
-[data-page="users"],#page-users{display:none!important}
-[data-page="prompts"],#page-prompts{display:none!important}
+
 /* Parse Admin refresh */
 :root{--accent:#4f46e5;--ink:#111827;--stroke:#e5e7eb;--shadow:0 8px 30px rgba(15,23,42,.045)}body.app-page{background:#f6f7fb!important;color:var(--ink)!important}.sidebar{width:270px!important;background:#fff!important;border-left:1px solid #e9edf3!important;padding:22px 16px!important;box-shadow:4px 0 28px rgba(15,23,42,.025)}.sidebar-brand{padding-bottom:22px!important;border-color:#edf0f4!important}.brand-symbol{background:linear-gradient(135deg,#4f46e5,#818cf8)!important;color:#fff!important}.workspace-switch{background:#f8fafc!important;border:1px solid #e8edf3!important}.nav-caption{color:#9aa4b2!important;font-weight:700!important;padding-top:22px!important}.nav-item{height:42px!important;margin:3px 0!important;border-radius:10px!important}.nav-item:hover{background:#f4f5fb!important}.nav-item.active{background:#eef2ff!important;color:#4338ca!important;box-shadow:inset -3px 0 #4f46e5!important;font-weight:700!important}.nav-item.active i{color:#4f46e5!important}.main-area{margin-right:270px!important;padding:0 32px 40px!important}.topbar{height:78px!important;border-bottom:1px solid #e9edf3!important}.system-status{border:1px solid #e5eaf0!important;border-radius:99px!important;padding:8px 12px!important;background:#fff}.page-view{animation:parseViewIn .22s ease-out}.page-heading{margin:28px 0!important}.page-heading h1{font-size:26px!important;font-weight:800!important}.panel-card,.metric-card{border-radius:16px!important;border-color:#e8edf3!important;box-shadow:var(--shadow)!important}.metric-card{padding:22px!important}.form-panel,.result-panel{border-radius:16px!important}input.input,textarea.input,select.input,.field-wrap{border-radius:10px!important}.button{border-radius:10px!important}.button-primary{background:linear-gradient(135deg,#4f46e5,#6366f1)!important}.table-panel{overflow:hidden!important}.table-panel th{background:#f8fafc!important}.table-panel tbody tr:hover{background:#fafbff}.sidebar-bottom{border-top:1px solid #edf0f4!important}@keyframes parseViewIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}#parseStartup{position:fixed;inset:0;z-index:9999;background:#f7f8fc;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:18px;transition:opacity .35s,visibility .35s}#parseStartup.done{opacity:0;visibility:hidden;pointer-events:none}#parseStartup .mark{width:54px;height:54px;border-radius:17px;background:linear-gradient(135deg,#4f46e5,#818cf8);color:white;display:grid;place-items:center;font-weight:900;font-size:26px}#parseStartup .spin{width:24px;height:24px;border:3px solid #e0e7ff;border-top-color:#4f46e5;border-radius:50%;animation:parseSpin .7s linear infinite}#parseStartup p{color:#64748b;font-size:13px;margin:0}@keyframes parseSpin{to{transform:rotate(360deg)}}@media(max-width:1100px){.main-area{margin-right:0!important;padding:0 18px 24px!important}.sidebar{width:270px!important}}@media(max-width:700px){.topbar{height:68px!important}.page-heading h1{font-size:22px!important}.metric-card{padding:16px!important}}
 
@@ -957,3 +950,17 @@ body.app-page{background:#f4f7f6!important;color:#243c39!important}.sidebar{posi
 
 @media(max-width:900px){.sidebar{transform:translateX(110%)!important;visibility:hidden!important;pointer-events:none!important;z-index:10000!important}.sidebar.open{transform:translateX(0)!important;visibility:visible!important;pointer-events:auto!important}.mobile-menu{z-index:10001!important;position:relative!important;pointer-events:auto!important}body.nav-open:before{z-index:9999!important}.mobile-nav-dock{z-index:9998!important}}
 \n/* mobile quick dock + light mode */\n.mobile-quick-dock{display:none}@media(max-width:900px){.mobile-quick-dock{display:flex;position:fixed;bottom:max(10px,env(safe-area-inset-bottom));left:12px;right:12px;z-index:40;justify-content:space-around;align-items:center;padding:8px 10px;background:rgba(12,23,40,.92);border:1px solid var(--border);border-radius:16px;box-shadow:0 10px 32px #0005;backdrop-filter:blur(18px)}.mobile-quick-dock button{border:0;background:transparent;color:var(--muted);display:flex;flex-direction:column;gap:4px;align-items:center;font-size:10px;padding:5px 8px}.mobile-quick-dock button i{font-size:17px;color:var(--cyan)}body{padding-bottom:86px}.app-footer{margin-bottom:84px}}.light-theme{--bg:#eaf1f0;--panel:#fff;--panel2:#f5f8f7;--border:#cbd9d7;--muted:#687b7a;--text:#173432;background:var(--bg);color:var(--text)}.light-theme body,.light-theme .sidebar,.light-theme .topbar,.light-theme .panel-card{background:var(--bg);color:var(--text)}.light-theme .mobile-quick-dock{background:#fff;color:#143b39}\n
+/* Theme and navigation repair: theme applies to the complete console. */
+body.light-theme.app-page,
+body.app-page.light-theme { background:#f6f7fb!important; color:#173432!important; }
+body.light-theme .sidebar, body.light-theme .main-area, body.light-theme .topbar,
+body.light-theme .page-view, body.light-theme .panel-card, body.light-theme .workspace-switch,
+body.light-theme .nav-item, body.light-theme .mobile-nav-dock,
+body.light-theme .mobile-quick-dock { background:#fff!important; color:#173432!important; }
+body.light-theme .nav-item.active { background:#e8eefc!important; color:#3730a3!important; }
+body.light-theme .input, body.light-theme input, body.light-theme select, body.light-theme textarea {
+ background:#fff!important;color:#172b36!important;border-color:#cbd5e1!important;
+}
+body.light-theme .sidebar { border-color:#e2e8f0!important; }
+[data-page="users"], #page-users, [data-page="prompts"], #page-prompts,
+[data-page="usage"], #page-usage, [data-page="history"], #page-history { display:initial; }
