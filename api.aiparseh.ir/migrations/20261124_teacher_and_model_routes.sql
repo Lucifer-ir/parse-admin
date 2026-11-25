@@ -1,0 +1,3 @@
+-- Add teacher role and per-operation model routing.
+ALTER TABLE users MODIFY COLUMN role ENUM('user','admin','developer_admin','education_admin','teacher') NOT NULL DEFAULT 'user';
+CREATE TABLE IF NOT EXISTS ai_operation_model_routes (operation_key VARCHAR(60) NOT NULL, model_id VARCHAR(190) NOT NULL DEFAULT '', updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, PRIMARY KEY(operation_key)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

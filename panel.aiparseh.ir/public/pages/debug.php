@@ -1,0 +1,3 @@
+<section class="page-view" id="page-debug">
+<div class="page-heading"><div><div class="eyebrow">DIAGNOSTICS & ACCESS</div><h1>دیباگ سیستم</h1><p>خطاهای PHP، API، مرورگر، دسترسی و وضعیت درخواست‌ها؛ بدون ثبت رمز یا کلیدها.</p></div></div>
+<div class="panel-card"><div class="panel-heading"><div><h3>گزارش خطاها</h3><p id="debugStatus">در حال بارگذاری...</p></div><div class="inline-actions"><button class="button button-secondary" id="debugRefresh">تازه‌سازی</button><button class="button button-danger" id="debugClear">پاک کردن گزارش‌ها</button></div></div><div id="debugLogs" style="overflow:auto;max-height:70vh"></div></div></section>
