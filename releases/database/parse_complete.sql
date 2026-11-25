@@ -1,4 +1,4 @@
--- SOURCE: backend/schema.sql
+-- SOURCE FILE: backend/schema.sql
 -- Parse Admin / Parse API schema
 -- Safe to execute repeatedly: CREATE TABLE IF NOT EXISTS only; no data is dropped.
 CREATE TABLE IF NOT EXISTS users (
@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS admin_audit_log (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
--- SOURCE: backend/migrations/20261123_ai_console.sql
+-- SOURCE FILE: backend/migrations/20261123_ai_console.sql
 CREATE TABLE IF NOT EXISTS ai_provider_settings (
     id TINYINT UNSIGNED NOT NULL,
     provider VARCHAR(40) NOT NULL DEFAULT 'paasta',
@@ -149,7 +149,7 @@ INSERT IGNORE INTO ai_prompt_templates (slug,title,generation_type,system_prompt
 ('review-fa','بررسی و ویرایش متن فارسی','review','تو ویراستار و ارزیاب دقیق زبان فارسی هستی. متن را از نظر املا، دستور زبان، انسجام، وضوح، لحن و صحت ساختاری بررسی کن. ابتدا ایرادها و علت را فهرست کن و سپس نسخه اصلاح‌شده را ارائه بده. ادعای factual را بدون مدرک قطعی تأیید نکن.');
 
 
--- SOURCE: backend/migrations/20261123_ai_usage_metadata.sql
+-- SOURCE FILE: backend/migrations/20261123_ai_usage_metadata.sql
 -- Additive migration: preserve provider billing metadata returned for each request.
 SET @provider_meta_sql = (
   SELECT IF(
@@ -167,7 +167,7 @@ EXECUTE provider_meta_stmt;
 DEALLOCATE PREPARE provider_meta_stmt;
 
 
--- SOURCE: backend/migrations/20261123_learning_platform.sql
+-- SOURCE FILE: backend/migrations/20261123_learning_platform.sql
 -- Parse learning platform schema. Safe to run repeatedly.
 CREATE TABLE IF NOT EXISTS students (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -385,7 +385,7 @@ CREATE TABLE IF NOT EXISTS admin_ui_settings (
 INSERT IGNORE INTO admin_ui_settings (id,api_base_url) VALUES (1,'https://api.aiparseh.ir/api');
 
 
--- SOURCE: backend/migrations/20261123_tracks_and_activities.sql
+-- SOURCE FILE: backend/migrations/20261123_tracks_and_activities.sql
 CREATE TABLE IF NOT EXISTS learning_tracks (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   language_code VARCHAR(16) NOT NULL,
@@ -481,12 +481,12 @@ CREATE TABLE IF NOT EXISTS activity_answers (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
--- SOURCE: backend/migrations/20261124_admin_roles.sql
+-- SOURCE FILE: backend/migrations/20261124_admin_roles.sql
 -- Idempotently extend account roles without changing existing accounts or credentials.
 ALTER TABLE users MODIFY COLUMN role ENUM('user','admin','developer_admin','education_admin','teacher') NOT NULL DEFAULT 'user';
 
 
--- SOURCE: backend/migrations/20261124_language_levels_classes_audio.sql
+-- SOURCE FILE: backend/migrations/20261124_language_levels_classes_audio.sql
 -- Shared education catalogs for English, German and French; safe to replay.
 CREATE TABLE IF NOT EXISTS learning_languages (
   language_code VARCHAR(16) NOT NULL,
@@ -579,7 +579,7 @@ CREATE TABLE IF NOT EXISTS student_audio_responses (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
--- SOURCE: backend/migrations/20261124_teacher_and_model_routes.sql
+-- SOURCE FILE: backend/migrations/20261124_teacher_and_model_routes.sql
 -- Add teacher role and per-operation model routing.
 ALTER TABLE users MODIFY COLUMN role ENUM('user','admin','developer_admin','education_admin','teacher') NOT NULL DEFAULT 'user';
 CREATE TABLE IF NOT EXISTS ai_operation_model_routes (operation_key VARCHAR(60) NOT NULL, model_id VARCHAR(190) NOT NULL DEFAULT '', updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, PRIMARY KEY(operation_key)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
